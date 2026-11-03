@@ -260,13 +260,15 @@ async function loadDists() {
     <td>${!d.has_pw ? "待他设密码" : (d.status === "active" ? "正常" : "已停用")}</td>
     <td>${d.status === "active"
       ? `<button class="small danger" onclick="distAct('${d.slug}','disable')">停用</button>`
-      : `<button class="small ghost" onclick="distAct('${d.slug}','enable')">恢复</button>`}
+      : `<button class="small ghost" onclick="distAct('${d.slug}','enable')">恢复</button>
+         <button class="small danger" onclick="distAct('${d.slug}','delete')">删除账户</button>`}
       <button class="small ghost" onclick="distAct('${d.slug}','resetpw')">重置密码</button>
       <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button></td></tr>`).join("");
 }
 async function distAct(slug, action) {
   const body = { slug, action };
   if (action === "resetpw" && !confirm(`重置 ${slug} 的密码？他下次打开链接时要重新设置密码。`)) return;
+  if (action === "delete" && !confirm(`彻底删除分销商 ${slug}？删除后他的链接立即失效、不可恢复（他已发出的客户不受影响）。`)) return;
   if (action === "quota") {
     const q = prompt(`分销商 ${slug} 的总额度（个数，-1 = 不限）：`);
     if (q === null || q === "") return;

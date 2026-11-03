@@ -63,6 +63,13 @@ export async function onRequestPost({ request, env }) {
       // fresh one himself (see /api/dist/setup).
       await putDist(env, slug, { ...rec, pw_hash: null });
       return json({ ok: true });
+    case "delete":
+      // Only a disabled account can be deleted (guard against wiping
+      // an active distributor). His already-issued customers keep
+      // their licenses untouched; the /<slug> link dies immediately.
+      if (rec.status !== "disabled") return json({ ok: false, reason: "disable_first" }, 400);
+      await env.V2.delete("dist:" + slug);
+      return json({ ok: true });
     default:
       return json({ ok: false, reason: "bad_action" }, 400);
   }

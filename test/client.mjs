@@ -221,5 +221,13 @@ const resetPw = await j("/api/admin/dist", { slug: "abc", action: "resetpw" }, {
 const state2 = await (await fetch(BASE + "/api/dist/state?slug=abc")).json();
 check("admin reset -> needs_setup again", resetPw.status === 200 && state2.needs_setup === true);
 
+// delete: only a disabled account can be removed, then the slug is gone
+const delActive = await j("/api/admin/dist", { slug: "abc", action: "delete" }, { cookie });
+check("delete of active account refused", delActive.status === 400);
+await j("/api/admin/dist", { slug: "abc", action: "disable" }, { cookie });
+const delOk = await j("/api/admin/dist", { slug: "abc", action: "delete" }, { cookie });
+const state3 = await fetch(BASE + "/api/dist/state?slug=abc");
+check("disabled account deleted, slug gone", delOk.status === 200 && state3.status === 404);
+
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);
 process.exit(fail ? 1 : 0);
