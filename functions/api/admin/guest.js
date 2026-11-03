@@ -1,6 +1,6 @@
 import {
   json, readJson, nowSec, isAdmin, sha256hex, getGuest, putGuest, newGuestId,
-  bumpDataVersion, cachedPayload,
+  bumpDataVersion, cachedPayload, guestFetchView, guestFetchReset,
   guestProblem, vaultSeal, SLUG_RE, parseDurationSec, parseDeltaSec, durationSeconds, fmtDuration,
 } from "../../lib/core.js";
 
@@ -26,6 +26,7 @@ export async function onRequestGet({ request, env }) {
         duration_text: fmtDuration(durationSeconds(rec)),
         status: rec.status, created_at: rec.created_at, expires_at: rec.expires_at,
         expired: rec.status !== "disabled" && !!guestProblem(rec),
+        fetch: guestFetchView(rec),
       });
     }
     // Oldest first: a newly added guest appends at the bottom of the
@@ -98,7 +99,7 @@ export async function onRequestPost({ request, env }) {
       await putGuest(env, id, { ...rec, status: "disabled" });
       return json({ ok: true });
     case "enable":
-      await putGuest(env, id, { ...rec, status: "active" });
+      await putGuest(env, id, { ...rec, status: "active", ...guestFetchReset() });
       return json({ ok: true });
     case "extend": {
       if (!rec.expires_at) return json({ ok: false, reason: "permanent" }, 400);

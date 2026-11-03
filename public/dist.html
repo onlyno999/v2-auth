@@ -254,7 +254,7 @@ async function loadGuests() {
     <td>${g.username}<div class="muted">${g.note || ""}</div></td>
     <td class="mono" data-label="专属页面">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
     <td data-label="到期">${g.expires_at ? fmt(g.expires_at) : "—"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
-    <td data-label="状态">${st}</td>
+    <td data-label="状态">${st}${g.fetch && g.fetch.auto_disabled ? `<div style="color:#c0392b">自动停用：近7天出现在 ${g.fetch.auto_disabled.regions.length} 个省份<div class="muted">${g.fetch.auto_disabled.regions.join("、")}</div></div>` : ""}${g.fetch && g.fetch.fetch_count ? `<div class="muted">拉取 ${g.fetch.fetch_count} 次 · 最近 ${g.fetch.last_region || "?"} ${g.fetch.last_fetch_at ? fmt(g.fetch.last_fetch_at) : ""} · 近7天 ${g.fetch.regions_7d.length} 省</div>` : ""}</td>
     <td class="acts">${g.status === "disabled"
       ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>
          <button class="small danger" onclick="guestAct('${g.id}','delete')">删除</button>`

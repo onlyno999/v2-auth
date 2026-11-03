@@ -1,4 +1,4 @@
-import { getGuest, guestProblem, vaultOpen, logEvent } from "../lib/core.js";
+import { getGuest, guestProblem, vaultOpen, logEvent, noteGuestFetch } from "../lib/core.js";
 import { serveSubscription } from "../api/subscription.js";
 
 // GET /s/<sealed-token>
@@ -31,6 +31,24 @@ export async function onRequestGet({ request, env, params }) {
     await logEvent(env, "guest_sub_deny", rec.username || "", problem);
     return deny(problem);
   }
+
+  // Fetch watching: note where this fetch came from (Cloudflare IP
+  // geolocation). More than 5 distinct provinces in 7 days means
+  // the link is being shared — the guest is disabled on the spot
+  // and this fetch is denied too. TEST_REGION_HEADER exists only
+  // in local dev vars (never set in production) so the region rule
+  // can be exercised end-to-end with an x-test-region header.
+  const cf = request.cf || {};
+  let region = "";
+  if (env.TEST_REGION_HEADER) region = request.headers.get("x-test-region") || "";
+  if (!region) region = cf.region || "";
+  if (!region && cf.country) region = cf.country;
+  const verdict = await noteGuestFetch(env, payload.g, rec, {
+    ip: request.headers.get("cf-connecting-ip") || "",
+    ua: (request.headers.get("user-agent") || "").slice(0, 120),
+    region,
+  });
+  if (verdict.disabled) return deny("disabled");
 
   const content = await serveSubscription(env, rec.channel === "dist" ? "dist" : "main");
   if (!content) return deny("sub_unavailable", 502);

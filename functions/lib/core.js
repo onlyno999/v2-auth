@@ -414,6 +414,68 @@ export function guestProblem(rec) {
   return null;
 }
 
+// ---------- guest fetch watching ----------
+// Every successful /s/ fetch is noted on the guest record: total
+// count, last IP / client / region, and the set of regions seen in
+// the last 7 days (region -> last-seen). Region is Cloudflare's IP
+// geolocation for the fetching client (request.cf.region; the
+// country code is the bucket when no region is reported). The
+// owner's sharing rule (2026-11-04): one link showing up in more
+// than 5 different provinces inside a week is being shared — the
+// guest is disabled on the spot, the tripping fetch included.
+// Re-enabling in a console clears the region history, so a
+// forgiven guest starts clean instead of re-tripping at once.
+export const GUEST_REGION_LIMIT = 5;
+export const GUEST_REGION_WINDOW_SEC = 7 * 86400;
+
+export async function noteGuestFetch(env, id, rec, meta) {
+  const now = nowSec();
+  const regions = { ...(rec.fetch_regions || {}) };
+  for (const [k, ts] of Object.entries(regions)) {
+    if (now - ts > GUEST_REGION_WINDOW_SEC) delete regions[k];
+  }
+  if (meta.region) regions[meta.region] = now;
+  const regionCount = Object.keys(regions).length;
+  const next = {
+    ...rec,
+    fetch_regions: regions,
+    fetch_count: (rec.fetch_count || 0) + 1,
+    last_fetch_at: now,
+    last_ip: meta.ip || rec.last_ip || "",
+    last_ua: meta.ua || rec.last_ua || "",
+    last_region: meta.region || rec.last_region || "",
+  };
+  if (regionCount > GUEST_REGION_LIMIT) {
+    next.status = "disabled";
+    next.auto_disabled = { at: now, regions: Object.keys(regions) };
+    await putGuest(env, id, next);
+    await logEvent(env, "guest_auto_disable", rec.username || id, Object.keys(regions).join(","));
+    return { disabled: true, regionCount };
+  }
+  await putGuest(env, id, next);
+  return { disabled: false, regionCount };
+}
+
+export function guestFetchView(rec) {
+  const now = nowSec();
+  const regions = Object.entries(rec.fetch_regions || {})
+    .filter(([, ts]) => now - ts <= GUEST_REGION_WINDOW_SEC)
+    .map(([k]) => k);
+  return {
+    fetch_count: rec.fetch_count || 0,
+    last_fetch_at: rec.last_fetch_at || null,
+    last_ip: rec.last_ip || "",
+    last_ua: rec.last_ua || "",
+    last_region: rec.last_region || "",
+    regions_7d: regions,
+    auto_disabled: rec.auto_disabled || null,
+  };
+}
+
+export function guestFetchReset() {
+  return { fetch_regions: {}, auto_disabled: null };
+}
+
 export async function guestSessionCookie(env, id) {
   const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 24 * 30, gst: id })));
   const mac = await hmac(env.SESSION_SECRET, payload);

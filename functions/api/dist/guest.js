@@ -1,7 +1,7 @@
 import {
   json, readJson, nowSec, distSlugFromRequest, getDist, putDist, sha256hex,
   bumpDataVersion,
-  getGuest, putGuest, newGuestId, guestProblem, vaultSeal, SLUG_RE,
+  getGuest, putGuest, newGuestId, guestProblem, vaultSeal, SLUG_RE, guestFetchView, guestFetchReset,
   parseDurationSec, durationSeconds, fmtDuration, logEvent,
 } from "../../lib/core.js";
 
@@ -42,6 +42,7 @@ export async function onRequestGet({ request, env }) {
       duration_text: fmtDuration(durationSeconds(rec)),
       status: rec.status, created_at: rec.created_at, expires_at: rec.expires_at,
       expired: rec.status !== "disabled" && !!guestProblem(rec),
+      fetch: guestFetchView(rec),
     })),
   });
 }
@@ -106,7 +107,7 @@ export async function onRequestPost({ request, env }) {
       await putGuest(env, id, { ...rec, status: "disabled" });
       return json({ ok: true });
     case "enable":
-      await putGuest(env, id, { ...rec, status: "active" });
+      await putGuest(env, id, { ...rec, status: "active", ...guestFetchReset() });
       return json({ ok: true });
     case "set_expiry": {
       if (!("expires_at" in body)) return json({ ok: false, reason: "bad_expiry" }, 400);
