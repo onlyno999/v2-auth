@@ -4,31 +4,48 @@ const FRESH_SEC = 1800; // lazy refresh window: 30 min
 
 // Channel config: each license carries channel "main" | "dist".
 // main -> env.SUB_URL (KV sub:*), dist -> env.SUB_URL_DIST (KV subd:*).
-// If the dist URL is not configured yet, dist devices fall back to main.
-function channelCfg(env, channel) {
-  if (channel === "dist" && env.SUB_URL_DIST) {
-    return { url: env.SUB_URL_DIST, prefix: "subd" };
+// Distributors share the main subscription unless a SEPARATE, VALID
+// dist URL is configured: a value that is not an http(s) URL at all
+// (the dashboard once held the literal text "mm") counts as "not
+// configured" and falls back to main, instead of breaking every
+// distributor pull.
+function usableUrl(v) {
+  if (!v) return null;
+  try {
+    const u = new URL(v);
+    return u.protocol === "http:" || u.protocol === "https:" ? v : null;
+  } catch {
+    return null;
   }
-  return { url: env.SUB_URL, prefix: "sub" };
+}
+function channelCfg(env, channel) {
+  if (channel === "dist") {
+    const dist = usableUrl(env.SUB_URL_DIST);
+    if (dist) return { url: dist, prefix: "subd" };
+  }
+  return { url: usableUrl(env.SUB_URL), prefix: "sub" };
 }
 
 export async function serveSubscription(env, channel) {
   const { url, prefix } = channelCfg(env, channel);
-  let content = await env.V2.get(prefix + ":content");
-  const fetchedAt = parseInt((await env.V2.get(prefix + ":fetched_at")) || "0", 10);
-  if (!content || nowSec() - fetchedAt > FRESH_SEC) {
-    try {
-      const up = await fetch(url, { headers: { "user-agent": "okhttp/4.9.0" } });
-      if (up.ok) {
-        const text = await up.text();
-        if (text && text.length > 50) {
-          content = text;
-          await env.V2.put(prefix + ":content", text);
-          await env.V2.put(prefix + ":fetched_at", String(nowSec()));
+  let content = null;
+  try {
+    content = await env.V2.get(prefix + ":content");
+    const fetchedAt = parseInt((await env.V2.get(prefix + ":fetched_at")) || "0", 10);
+    if (url && (!content || nowSec() - fetchedAt > FRESH_SEC)) {
+      try {
+        const up = await fetch(url, { headers: { "user-agent": "okhttp/4.9.0" } });
+        if (up.ok) {
+          const text = await up.text();
+          if (text && text.length > 50) {
+            content = text;
+            await env.V2.put(prefix + ":content", text);
+            await env.V2.put(prefix + ":fetched_at", String(nowSec()));
+          }
         }
-      }
-    } catch { /* keep serving the stale KV copy */ }
-  }
+      } catch { /* keep serving the stale KV copy */ }
+    }
+  } catch { /* never let subscription serving crash the caller */ }
   return content;
 }
 
