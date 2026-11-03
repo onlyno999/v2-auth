@@ -9,7 +9,7 @@ import { buildTree } from "../../lib/tree.js";
 export async function onRequestGet({ request, env }) {
   const me = await distSlugFromRequest(env, request);
   if (!me) return json({ ok: false, reason: "unauthorized" }, 401);
-  const slug = (new URL(request.url).searchParams.get("slug") || "").toLowerCase();
+  const slug = (new URL(request.url).searchParams.get("slug") || me).toLowerCase();
   if (slug !== me) {
     let cur = await getDist(env, slug);
     if (!cur) return json({ ok: false, reason: "not_found" }, 404);

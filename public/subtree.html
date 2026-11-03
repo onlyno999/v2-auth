@@ -76,7 +76,7 @@
 const $ = (id) => document.getElementById(id);
 const PAGE = "subtree.html";
 const API = "/api/dist/subtree";
-const ACT = false;
+const ACT = true;
 const params = new URLSearchParams(location.search);
 const SLUG = (params.get("slug") || "").toLowerCase();
 const FROM = params.get("from") || "";
@@ -91,6 +91,23 @@ async function api(path, opts = {}) {
 function onData(data) {
   if (data.viewer) $("homeBtn").href = "/" + data.viewer;
 }
+async function people(kind, target, action) {
+  const { data } = await api("/api/dist/people", { method: "POST", body: JSON.stringify({ kind, target, action }) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  load();
+}
+async function devAct(machine, action) {
+  if (action === "revoke" && !confirm(`停用 ${machine} 的线路？他的客户端立刻用不了（可恢复）。`)) return;
+  people("device", machine, action);
+}
+window.devAct = devAct;
+async function guestAct(id, action) { people("guest", id, action); }
+window.guestAct = guestAct;
+async function subAct(slug, action) {
+  if (action === "disable" && !confirm(`停用分销商 ${slug}？他将登不进后台（他已发出的客户不受影响，可恢复）。`)) return;
+  people("sub", slug, action);
+}
+window.subAct = subAct;
 
 
 async function load() {
@@ -125,7 +142,7 @@ async function load() {
     <td class="mono" data-label="分销商">${x.slug}<div class="muted">${x.name || ""} · 第${x.level}级</div></td>
     <td data-label="名下">客户 ${x.devices} 台${x.pending ? "（待激活 " + x.pending + "）" : ""} · 游客 ${x.guests} 个 · 下级 ${x.children} 个</td>
     <td data-label="状态">${x.status === "disabled" ? "已停用" : "正常"}</td>
-    <td class="acts"><a href="${PAGE}?slug=${x.slug}&from=${SLUG}"><button class="small ghost">进去看</button></a>
+    <td class="acts"><a href="${PAGE}?slug=${x.slug}&from=${SLUG}from=${data.dist.slug}"><button class="small ghost">进去看</button></a>
     ${ACT ? (x.status === "disabled"
       ? `<button class="small ghost" onclick="subAct('${x.slug}','enable')">恢复</button>`
       : `<button class="small danger" onclick="subAct('${x.slug}','disable')">停用</button>`) : ""}</td>
