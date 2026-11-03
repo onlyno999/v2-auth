@@ -3,9 +3,23 @@ import {
 } from "../../lib/core.js";
 
 // POST {machineCode, action: revoke|restore|unbind|extend, days?}  (admin)
+// Or {licKey, action: revoke} to kill an issued-but-unused code.
 export async function onRequestPost({ request, env }) {
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);
+
+  if (body.licKey) {
+    const lic = await getLicByKey(env, body.licKey);
+    if (!lic) return json({ ok: false, reason: "not_found" }, 404);
+    if (body.action === "revoke") {
+      await putLic(env, { ...lic, status: "revoked" });
+      if (lic.machine) await env.V2.delete("open:" + lic.machine);
+      await logEvent(env, "admin_revoke_code", lic.machine || "");
+      return json({ ok: true });
+    }
+    return json({ ok: false, reason: "bad_action" }, 400);
+  }
+
   const machine = body.machineCode;
   if (!machine) return json({ ok: false, reason: "no_machine" }, 400);
   const dev = await getDev(env, machine);

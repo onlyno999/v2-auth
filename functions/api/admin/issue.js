@@ -18,6 +18,7 @@ export async function onRequestPost({ request, env }) {
     status: mode === "open" ? "open" : "issued",
     machine: body.machineCode,
     note: body.note || "",
+    channel: body.channel === "dist" ? "dist" : "main",
     created_at: nowSec(),
     activated_at: null,
     expires_at: null,

@@ -173,3 +173,41 @@ export async function readJson(request) {
     return {};
   }
 }
+
+// ---------- distributors ----------
+// KV: dist:<slug> -> {name, pw_hash, quota, used, status, created_at}
+// The distributor's login address is https://<domain>/<slug> (see
+// functions/_middleware.js). Licenses they issue carry dist=<slug>
+// and channel="dist" (they pull SUB_URL_DIST).
+export async function getDist(env, slug) {
+  const raw = await env.V2.get("dist:" + slug);
+  return raw ? JSON.parse(raw) : null;
+}
+export async function putDist(env, slug, rec) {
+  await env.V2.put("dist:" + slug, JSON.stringify(rec));
+}
+export const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,23}$/;
+export const RESERVED_SLUGS = new Set(["api", "index", "dist", "admin", "assets"]);
+
+export async function distSessionCookie(env, slug) {
+  const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 24 * 7, dist: slug })));
+  const mac = await hmac(env.SESSION_SECRET, payload);
+  return `${payload}.${mac}`;
+}
+export async function distSlugFromRequest(env, request) {
+  const cookie = request.headers.get("cookie") || "";
+  const m = cookie.match(/dsess=([^;]+)/);
+  if (!m || !env.SESSION_SECRET) return null;
+  const [payload, mac] = m[1].split(".");
+  if (!payload || !mac) return null;
+  if ((await hmac(env.SESSION_SECRET, payload)) !== mac) return null;
+  try {
+    const data = JSON.parse(new TextDecoder().decode(b64Decode(payload)));
+    if (!data.dist || data.exp <= nowSec()) return null;
+    const rec = await getDist(env, data.dist);
+    if (!rec || rec.status !== "active") return null;
+    return data.dist;
+  } catch {
+    return null;
+  }
+}

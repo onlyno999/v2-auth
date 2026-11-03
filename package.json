@@ -1,1 +1,1 @@
-{"name":"v2-auth","private":true,"scripts":{"dev":"wrangler pages dev --kv V2 --port 8788","test":"node test/client.mjs"},"type":"module","version":"0.1.0","devDependencies":{"wrangler":"^4.157.0"}}
+{"name":"v2-auth","private":true,"scripts":{"dev":"wrangler pages dev public --kv V2 --port 8788","test":"node test/client.mjs"},"type":"module","version":"0.1.0","devDependencies":{"wrangler":"^4.157.0"}}

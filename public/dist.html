@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>分销商后台</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; background: #f4f5f7; color: #1c2333; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 20px; margin: 8px 0 4px; }
+  h2 { font-size: 15px; margin: 22px 0 10px; color: #334; }
+  .card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(20,30,60,.08); }
+  input, select { padding: 8px 10px; border: 1px solid #ccd2dd; border-radius: 6px; font-size: 14px; }
+  button { padding: 8px 14px; border: 0; border-radius: 6px; background: #14181f; color: #fff; font-size: 14px; cursor: pointer; }
+  button.ghost { background: #e8ebf0; color: #1c2333; }
+  button.small { padding: 4px 9px; font-size: 12px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #eceef2; }
+  th { color: #667; font-weight: 600; }
+  .mono { font-family: ui-monospace, Consolas, monospace; }
+  .code { font-size: 20px; font-weight: 700; letter-spacing: 1px; background: #fff8e6; border: 1px dashed #d9a441; padding: 10px 14px; border-radius: 8px; display: inline-block; }
+  .muted { color: #889; font-size: 12px; }
+  .hidden { display: none; }
+  #msg { margin: 10px 0; color: #b03a2e; min-height: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="title">分销商后台</h1>
+  <div class="muted" id="quotaLine"></div>
+
+  <div id="loginBox" class="card" style="margin-top:14px">
+    <div class="row">
+      <input id="pw" type="password" placeholder="分销商密码" style="flex:1;min-width:200px">
+      <button id="loginBtn">登录</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <div id="console" class="hidden">
+    <h2>给客户激活</h2>
+    <div class="card">
+      <div class="row">
+        <input id="mc" placeholder="客户的机器码" style="flex:2;min-width:220px" class="mono">
+        <select id="days">
+          <option value="30">30 天</option>
+          <option value="90">90 天</option>
+          <option value="180">180 天</option>
+          <option value="365" selected>365 天</option>
+        </select>
+        <input id="note" placeholder="备注（客户名）" style="flex:1;min-width:140px">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="issueBtn">生成激活码</button>
+        <button id="openBtn" class="ghost">直接开通（免输码）</button>
+        <span id="issueMsg" class="muted"></span>
+      </div>
+      <div id="codeOut" style="margin-top:12px" class="hidden">
+        <span class="code mono" id="codeText"></span>
+        <button id="copyBtn" class="ghost small">复制</button>
+        <div class="muted" style="margin-top:6px">把码发给客户，他在客户端输一次即可。码已与这台机器绑定。</div>
+      </div>
+    </div>
+
+    <h2>我的客户 <button id="refreshBtn" class="ghost small">刷新</button></h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>机器码 / 备注</th><th>激活</th><th>到期</th><th>最近打开</th><th>状态</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const slug = location.pathname.replace(/\//g, "");
+const api = async (path, opts = {}) => {
+  const r = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
+  return { status: r.status, data: await r.json().catch(() => ({})) };
+};
+const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString("zh-CN", { hour12: false }) : "—";
+
+async function loadMe() {
+  const { data } = await api("/api/dist/me");
+  if (data.ok) {
+    $("title").textContent = "分销商后台 · " + data.name;
+    $("quotaLine").textContent = data.quota < 0
+      ? `已发 ${data.used} 个（不限量）`
+      : `额度：共 ${data.quota} 个，已发 ${data.used} 个，剩 ${data.remaining} 个`;
+    $("loginBox").classList.add("hidden");
+    $("console").classList.remove("hidden");
+    loadDevices();
+  }
+}
+async function doLogin() {
+  const { status, data } = await api("/api/dist/login", {
+    method: "POST", body: JSON.stringify({ slug, password: $("pw").value }),
+  });
+  if (status === 200 && data.ok) loadMe();
+  else $("msg").textContent = data.reason === "no_distributor" ? "此地址不存在或已被停用" : "密码不对";
+}
+$("loginBtn").onclick = doLogin;
+$("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+
+$("issueBtn").onclick = async () => {
+  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), mode: "code" };
+  if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
+  const { data } = await api("/api/dist/issue", { method: "POST", body: JSON.stringify(body) });
+  if (data.ok) {
+    $("codeText").textContent = data.code;
+    $("codeOut").classList.remove("hidden");
+    $("issueMsg").textContent = "";
+    loadMe();
+  } else $("issueMsg").textContent = "失败：" + (data.reason === "quota_exhausted" ? "额度用完了，联系上级补充" : data.reason || "");
+};
+$("openBtn").onclick = async () => {
+  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), mode: "open" };
+  if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
+  const { data } = await api("/api/dist/issue", { method: "POST", body: JSON.stringify(body) });
+  $("issueMsg").textContent = data.ok ? "已开通：让客户在客户端点「我已付款」即可进入" : "失败：" + (data.reason || "");
+  if (data.ok) loadMe();
+};
+$("copyBtn").onclick = () => navigator.clipboard.writeText($("codeText").textContent);
+
+async function loadDevices() {
+  const { data } = await api("/api/dist/devices");
+  if (!data.ok) { $("tbody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
+  if (!data.devices.length) { $("tbody").innerHTML = '<tr><td colspan="5" class="muted">还没有客户</td></tr>'; return; }
+  $("tbody").innerHTML = data.devices.map((d) => `<tr>
+    <td class="mono">${d.machine}<div class="muted">${d.lic.note || ""}</div></td>
+    <td>${fmt(d.lic.activated_at)}</td>
+    <td>${d.lic.expires_at ? fmt(d.lic.expires_at) : "—"}</td>
+    <td>${fmt(d.last_seen)}</td>
+    <td>${d.lic.status}</td></tr>`).join("");
+}
+$("refreshBtn").onclick = loadDevices;
+loadMe();
+</script>
+</body>
+</html>

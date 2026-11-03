@@ -90,6 +90,15 @@ const badActivate = await j("/api/activate", { machineCode: M1, code: "V2O-XXXXX
 check("activate wrong code rejected", badActivate.status === 403 && badActivate.data.reason === "not_found");
 const crossActivate = await j("/api/activate", { machineCode: M1, code: issue2.data.code, pubkey: dev1.pubkey });
 check("code bound to other machine rejected", crossActivate.status === 403 && crossActivate.data.reason === "bound_other");
+
+// issued-but-unused codes are listed for the seller, and can be killed
+const listWithIssued = await (await fetch(BASE + "/api/admin/devices", { headers: { cookie } })).json();
+const issuedM2 = (listWithIssued.issued || []).find((i) => i.machine === M2);
+check("issued code listed before activation", !!issuedM2 && issuedM2.status === "issued");
+const killCode = await j("/api/admin/action", { licKey: issuedM2.licKey, action: "revoke" }, { cookie });
+const dev2x = await newDeviceKey();
+const deadActivate = await j("/api/activate", { machineCode: M2, code: issue2.data.code, pubkey: dev2x.pubkey });
+check("revoked unused code cannot activate", killCode.status === 200 && deadActivate.status === 403 && deadActivate.data.reason === "revoked");
 const act1 = await j("/api/activate", { machineCode: M1, code: issue1.data.code, pubkey: dev1.pubkey, platform: "android-test" });
 check("activate ok + token", act1.status === 200 && !!act1.data.token && !!act1.data.expires_at);
 
@@ -112,6 +121,17 @@ check("subscription delivered", sub1.status === 200 && sub1.text.length > 500,
   `len=${sub1.text.length} sha256=${Buffer.from(subHash).toString("hex").slice(0, 16)}…`);
 const subDeny = await j("/api/subscription", { machineCode: M1, token: "bogus" });
 check("subscription denied without auth", subDeny.status === 403);
+
+// distributor channel: separate subscription URL (SUB_URL_DIST)
+const M4 = "TESTMACH000000004";
+const issueD = await j("/api/admin/issue", { machineCode: M4, days: 30, note: "分销客户", mode: "code", channel: "dist" }, { cookie });
+const dev4 = await newDeviceKey();
+const act4 = await j("/api/activate", { machineCode: M4, code: issueD.data.code, pubkey: dev4.pubkey });
+const subDist = await signedCall("/api/subscription", M4, dev4.kp);
+const expectedDist = await (await fetch("http://127.0.0.1:8899/sub_dist.txt")).text();
+check("dist channel gets dist subscription",
+  act4.status === 200 && subDist.status === 200 && subDist.text === expectedDist,
+  `len=${subDist.text.length}`);
 
 // claim flow (direct-open)
 const open3 = await j("/api/admin/issue", { machineCode: M3, days: 90, note: "直开户", mode: "open" }, { cookie });
@@ -136,6 +156,41 @@ const devList = await fetch(BASE + "/api/admin/devices", { headers: { cookie } }
 check("device table lists devices", devList.ok && devList.devices.length >= 2, `${devList.devices?.length} devices`);
 const noAuthList = await fetch(BASE + "/api/admin/devices").then((r) => r.status);
 check("device table requires login", noAuthList === 401);
+
+// ---------- 3. distributor portal (/mmm) ----------
+const createDist = await j("/api/admin/dist", { action: "create", slug: "mmm", name: "分销老王", password: "dist-pw-1", quota: 2 }, { cookie });
+check("admin creates distributor", createDist.status === 200 && createDist.data.ok === true);
+const portal = await fetch(BASE + "/mmm");
+const portalHtml = await portal.text();
+check("portal /mmm serves distributor console", portal.status === 200 && portalHtml.includes("分销商后台"));
+check("unknown slug 404s", (await fetch(BASE + "/nosuchslug")).status === 404);
+const distBadLogin = await j("/api/dist/login", { slug: "mmm", password: "nope" });
+check("dist bad password rejected", distBadLogin.status === 401);
+const distLoginRes = await fetch(BASE + "/api/dist/login", {
+  method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ slug: "mmm", password: "dist-pw-1" }),
+});
+const dcookie = (distLoginRes.headers.get("set-cookie") || "").split(";")[0];
+check("dist login ok", distLoginRes.status === 200 && dcookie.startsWith("dsess="));
+const dme = await fetch(BASE + "/api/dist/me", { headers: { cookie: dcookie } }).then((r) => r.json());
+check("dist me + quota", dme.ok === true && dme.remaining === 2);
+const M5 = "TESTMACH000000005", M6 = "TESTMACH000000006", M7 = "TESTMACH000000007";
+const dIssue1 = await j("/api/dist/issue", { machineCode: M5, days: 30, note: "王客户", mode: "code" }, { cookie: dcookie });
+check("dist issues code", dIssue1.status === 200 && /^V2O-/.test(dIssue1.data.code || ""));
+const dPerm = await j("/api/dist/issue", { machineCode: M6, days: 0, note: "" }, { cookie: dcookie });
+check("dist permanent rejected (max 1y rule)", dPerm.status === 400);
+const dev5 = await newDeviceKey();
+const act5 = await j("/api/activate", { machineCode: M5, code: dIssue1.data.code, pubkey: dev5.pubkey });
+const sub5 = await signedCall("/api/subscription", M5, dev5.kp);
+check("dist customer pulls DIST subscription", act5.status === 200 && sub5.status === 200 && sub5.text === expectedDist);
+const dIssue2 = await j("/api/dist/issue", { machineCode: M6, days: 90, note: "", mode: "code" }, { cookie: dcookie });
+const dIssue3 = await j("/api/dist/issue", { machineCode: M7, days: 90, note: "", mode: "code" }, { cookie: dcookie });
+check("quota exhausted at limit", dIssue2.status === 200 && dIssue3.status === 403 && dIssue3.data.reason === "quota_exhausted");
+const dDevices = await fetch(BASE + "/api/dist/devices", { headers: { cookie: dcookie } }).then((r) => r.json());
+check("dist sees only own customers", dDevices.ok === true && dDevices.devices.length === 1 && dDevices.devices[0].machine === M5);
+const disableDist = await j("/api/admin/dist", { slug: "mmm", action: "disable" }, { cookie });
+const distLoginDisabled = await j("/api/dist/login", { slug: "mmm", password: "dist-pw-1" });
+check("disabled distributor cannot log in", disableDist.status === 200 && distLoginDisabled.status === 401);
 
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);
 process.exit(fail ? 1 : 0);

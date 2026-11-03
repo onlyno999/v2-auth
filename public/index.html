@@ -53,6 +53,10 @@
           <option value="365" selected>365 天</option>
           <option value="0">永久</option>
         </select>
+        <select id="channel">
+          <option value="main" selected>直营</option>
+          <option value="dist">分销</option>
+        </select>
         <input id="note" placeholder="备注（客户名）" style="flex:1;min-width:140px">
       </div>
       <div class="row" style="margin-top:10px">
@@ -78,6 +82,32 @@
         <tbody id="tbody"><tr><td colspan="8" class="muted">加载中…</td></tr></tbody>
       </table>
     </div>
+
+    <h2>已发出的码（还没激活）</h2>
+    <div class="card">
+      <table>
+        <thead><tr><th>机器码 / 备注</th><th>天数</th><th>渠道</th><th>发出时间</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="issuedBody"><tr><td colspan="6" class="muted">加载中…</td></tr></tbody>
+      </table>
+      <div class="muted" style="margin-top:8px">客户在客户端输码激活后，会自动出现在上面的设备总表里。激活码只在生成时显示一次，这里能看状态、能作废，但不能再把码看回来——码丢了就作废旧的、重新生成一个。</div>
+    </div>
+
+    <h2>分销商管理</h2>
+    <div class="card">
+      <div class="row">
+        <input id="dslug" placeholder="登录标识，如 mmm" style="width:150px" class="mono">
+        <input id="dname" placeholder="分销商名称" style="width:150px">
+        <input id="dpw" placeholder="他的登录密码（≥6位）" style="width:170px">
+        <input id="dquota" type="number" placeholder="额度（个数）" style="width:120px" value="100">
+        <button id="distCreateBtn">添加分销商</button>
+        <span id="distMsg" class="muted"></span>
+      </div>
+      <div class="muted" style="margin:8px 0">添加后，他的登录地址就是本站域名后面加 /标识，例如 https://你的域名/mmm —— 他只能给自己客户发码（走分销订阅）、看自己的客户；发码扣额度，最多 365 天。</div>
+      <table>
+        <thead><tr><th>标识 / 名称</th><th>登录地址</th><th>额度</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="distBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -97,6 +127,7 @@ async function doLogin() {
     $("loginBox").classList.add("hidden");
     $("console").classList.remove("hidden");
     loadDevices();
+    loadDists();
   } else {
     $("msg").textContent = "密码不对";
   }
@@ -105,7 +136,7 @@ $("loginBtn").onclick = doLogin;
 $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 
 $("issueBtn").onclick = async () => {
-  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), mode: "code" };
+  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), channel: $("channel").value, mode: "code" };
   if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
   const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
   if (data.ok) {
@@ -115,7 +146,7 @@ $("issueBtn").onclick = async () => {
   } else $("issueMsg").textContent = "失败：" + (data.reason || "");
 };
 $("openBtn").onclick = async () => {
-  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), mode: "open" };
+  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), channel: $("channel").value, mode: "open" };
   if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
   const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
   $("issueMsg").textContent = data.ok ? "已开通：让用户在客户端点「我已付款」即可进入" : "失败：" + (data.reason || "");
@@ -130,6 +161,27 @@ async function act(machine, action, days) {
 }
 window.act = act;
 
+function renderIssued(list) {
+  if (!list.length) {
+    $("issuedBody").innerHTML = '<tr><td colspan="6" class="muted">还没有发出过码</td></tr>';
+    return;
+  }
+  $("issuedBody").innerHTML = list.map((i) => `<tr>
+    <td class="mono">${i.machine || "—"}<div class="muted">${i.note || ""}</div></td>
+    <td>${i.days === 0 ? "永久" : i.days + " 天"}</td>
+    <td>${i.channel === "dist" ? "分销" + (i.dist ? "(" + i.dist + ")" : "") : "直营"}</td>
+    <td>${fmt(i.created_at)}</td>
+    <td>${i.status === "open" ? "已开通·待领取" : "未激活"}</td>
+    <td><button class="small danger" onclick="revokeCode('${i.licKey}')">作废</button></td></tr>`).join("");
+}
+async function revokeCode(licKey) {
+  if (!confirm("作废这个码？作废后客户就用不了了。")) return;
+  const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ licKey, action: "revoke" }) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  loadDevices();
+}
+window.revokeCode = revokeCode;
+
 async function loadDevices() {
   const { data } = await api("/api/admin/devices");
   if (!data.ok) { $("tbody").innerHTML = '<tr><td colspan="8">未登录或加载失败</td></tr>'; return; }
@@ -138,6 +190,7 @@ async function loadDevices() {
     pb.classList.remove("hidden");
     pb.innerHTML = "待领取开通（用户还没点「我已付款」）：<span class='mono'>" + data.pending_open.join("</span>, <span class='mono'>") + "</span>";
   } else pb.classList.add("hidden");
+  renderIssued(data.issued || []);
   if (!data.devices.length) {
     $("tbody").innerHTML = '<tr><td colspan="8" class="muted">还没有设备</td></tr>';
     return;
@@ -148,7 +201,7 @@ async function loadDevices() {
     const boot = d.integrity && d.integrity.boot && d.integrity.boot.deviceLocked === false
       ? '<div class="muted" style="color:#b03a2e">设备已解锁/root 标记</div>' : "";
     return `<tr>
-      <td class="mono">${d.machine}<div class="muted">${lic.note || ""}</div>${boot}</td>
+      <td class="mono">${d.machine}<div class="muted">${lic.note || ""}${lic.channel === "dist" ? " · 分销" : ""}${lic.dist ? "(" + lic.dist + ")" : ""}</div>${boot}</td>
       <td>${d.platform || "—"}</td>
       <td>${fmt(lic.activated_at)}</td>
       <td>${lic.expires_at ? fmt(lic.expires_at) : (lic.days === 0 ? "永久" : "—")}</td>
@@ -165,6 +218,44 @@ async function loadDevices() {
   }).join("");
 }
 $("refreshBtn").onclick = loadDevices;
+
+async function loadDists() {
+  const { data } = await api("/api/admin/dist");
+  if (!data.ok) { $("distBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
+  if (!data.distributors.length) {
+    $("distBody").innerHTML = '<tr><td colspan="5" class="muted">还没有分销商</td></tr>';
+    return;
+  }
+  $("distBody").innerHTML = data.distributors.map((d) => `<tr>
+    <td class="mono">${d.slug}<div class="muted">${d.name || ""}</div></td>
+    <td class="mono">${location.origin}/${d.slug}</td>
+    <td>${d.used} / ${d.quota < 0 ? "不限" : d.quota}</td>
+    <td>${d.status === "active" ? "正常" : "已停用"}</td>
+    <td>${d.status === "active"
+      ? `<button class="small danger" onclick="distAct('${d.slug}','disable')">停用</button>`
+      : `<button class="small ghost" onclick="distAct('${d.slug}','enable')">恢复</button>`}</td></tr>`).join("");
+}
+async function distAct(slug, action) {
+  const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify({ slug, action }) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  loadDists();
+}
+window.distAct = distAct;
+$("distCreateBtn").onclick = async () => {
+  const body = {
+    action: "create",
+    slug: $("dslug").value.trim().toLowerCase(),
+    name: $("dname").value.trim(),
+    password: $("dpw").value,
+    quota: Number($("dquota").value || 100),
+  };
+  if (!body.slug || !body.password) { $("distMsg").textContent = "标识和密码必填"; return; }
+  const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify(body) });
+  $("distMsg").textContent = data.ok
+    ? `已添加：他的登录地址 ${location.origin}/${body.slug}`
+    : "失败：" + (data.reason || "");
+  if (data.ok) loadDists();
+};
 </script>
 </body>
 </html>
