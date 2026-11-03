@@ -287,8 +287,17 @@ export async function gate(env, machineCode, body, path) {
 }
 
 // ---------- admin session ----------
-export async function sessionCookie(env, req) {
-  const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 24 * 30, admin: true })));
+// Login persistence is the user's own choice at the login form
+// (2026-11-04): how many days the console login stays valid —
+// default 1 day, maximum 7. Applies to the admin and distributor
+// consoles; guest-page sessions are a separate thing, unchanged.
+export function sessionDays(body) {
+  const d = Math.floor(Number(body && body.days));
+  if (!Number.isFinite(d)) return 1;
+  return Math.min(7, Math.max(1, d));
+}
+export async function sessionCookie(env, req, days = 1) {
+  const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + days * 86400, admin: true })));
   const mac = await hmac(env.SESSION_SECRET, payload);
   return `${payload}.${mac}`;
 }
@@ -351,8 +360,8 @@ export async function putDist(env, slug, rec) {
 export const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,23}$/;
 export const RESERVED_SLUGS = new Set(["api", "index", "dist", "admin", "assets", "guest", "s", "g"]);
 
-export async function distSessionCookie(env, slug) {
-  const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 24 * 30, dist: slug })));
+export async function distSessionCookie(env, slug, days = 1) {
+  const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + days * 86400, dist: slug })));
   const mac = await hmac(env.SESSION_SECRET, payload);
   return `${payload}.${mac}`;
 }
@@ -427,9 +436,24 @@ export function guestProblem(rec) {
 // forgiven guest starts clean instead of re-tripping at once.
 export const GUEST_REGION_LIMIT = 5;
 export const GUEST_REGION_WINDOW_SEC = 7 * 86400;
+// Daily fetch cap (owner's rule, 2026-11-04): one guest link may be
+// fetched at most 10 times per Beijing day; the 11th fetch is
+// refused and the link stays blocked until the day rolls over —
+// it recovers by itself the next day, no console action needed.
+export const GUEST_DAILY_LIMIT = 10;
+export function beijingDay(ts) {
+  return new Date((ts + 8 * 3600) * 1000).toISOString().slice(0, 10);
+}
 
 export async function noteGuestFetch(env, id, rec, meta) {
   const now = nowSec();
+  const today = beijingDay(now);
+  const dayCount = rec.fetch_day === today ? rec.fetch_day_count || 0 : 0;
+  if (dayCount >= GUEST_DAILY_LIMIT) {
+    // Blocked fetches are not recorded: retries must not inflate
+    // the stats, and the block lifts by itself at midnight.
+    return { dailyBlocked: true, disabled: false, dayCount };
+  }
   const regions = { ...(rec.fetch_regions || {}) };
   for (const [k, ts] of Object.entries(regions)) {
     if (now - ts > GUEST_REGION_WINDOW_SEC) delete regions[k];
@@ -440,6 +464,8 @@ export async function noteGuestFetch(env, id, rec, meta) {
     ...rec,
     fetch_regions: regions,
     fetch_count: (rec.fetch_count || 0) + 1,
+    fetch_day: today,
+    fetch_day_count: dayCount + 1,
     last_fetch_at: now,
     last_ip: meta.ip || rec.last_ip || "",
     last_ua: meta.ua || rec.last_ua || "",
@@ -450,10 +476,10 @@ export async function noteGuestFetch(env, id, rec, meta) {
     next.auto_disabled = { at: now, regions: Object.keys(regions) };
     await putGuest(env, id, next);
     await logEvent(env, "guest_auto_disable", rec.username || id, Object.keys(regions).join(","));
-    return { disabled: true, regionCount };
+    return { disabled: true, regionCount, dayCount: dayCount + 1 };
   }
   await putGuest(env, id, next);
-  return { disabled: false, regionCount };
+  return { disabled: false, regionCount, dayCount: dayCount + 1 };
 }
 
 export function guestFetchView(rec) {
@@ -463,6 +489,7 @@ export function guestFetchView(rec) {
     .map(([k]) => k);
   return {
     fetch_count: rec.fetch_count || 0,
+    fetch_day_count: rec.fetch_day === beijingDay(now) ? rec.fetch_day_count || 0 : 0,
     last_fetch_at: rec.last_fetch_at || null,
     last_ip: rec.last_ip || "",
     last_ua: rec.last_ua || "",
@@ -473,7 +500,7 @@ export function guestFetchView(rec) {
 }
 
 export function guestFetchReset() {
-  return { fetch_regions: {}, auto_disabled: null };
+  return { fetch_regions: {}, auto_disabled: null, fetch_day: null, fetch_day_count: 0 };
 }
 
 export async function guestSessionCookie(env, id) {

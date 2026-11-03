@@ -48,6 +48,7 @@ export async function onRequestGet({ request, env, params }) {
     ua: (request.headers.get("user-agent") || "").slice(0, 120),
     region,
   });
+  if (verdict.dailyBlocked) return deny("daily_limit", 429);
   if (verdict.disabled) return deny("disabled");
 
   const content = await serveSubscription(env, rec.channel === "dist" ? "dist" : "main");

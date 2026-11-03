@@ -1,4 +1,4 @@
-import { json, readJson, sha256hex, getDist, putDist, distSessionCookie } from "../../lib/core.js";
+import { json, readJson, sha256hex, getDist, putDist, distSessionCookie, sessionDays } from "../../lib/core.js";
 
 // POST {slug, password} -> first-visit password setup. Only works while
 // the distributor has no password yet (freshly created by the admin, or
@@ -12,8 +12,9 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: false, reason: "weak_password" }, 400);
   }
   await putDist(env, body.slug, { ...rec, pw_hash: await sha256hex(String(body.password)) });
-  const cookie = await distSessionCookie(env, body.slug);
-  return json({ ok: true, name: rec.name, session: cookie }, 200, {
-    "set-cookie": `dsess=${cookie}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`,
+  const days = sessionDays(body);
+  const cookie = await distSessionCookie(env, body.slug, days);
+  return json({ ok: true, name: rec.name, session: cookie, days }, 200, {
+    "set-cookie": `dsess=${cookie}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${days * 86400}`,
   });
 }

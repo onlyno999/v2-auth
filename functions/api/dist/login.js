@@ -1,6 +1,7 @@
-import { json, readJson, sha256hex, getDist, distSessionCookie } from "../../lib/core.js";
+import { json, readJson, sha256hex, getDist, distSessionCookie, sessionDays } from "../../lib/core.js";
 
-// POST {slug, password} -> distributor session cookie.
+// POST {slug, password, days?} -> distributor session cookie.
+// days is the login persistence choice: default 1, maximum 7.
 export async function onRequestPost({ request, env }) {
   const body = await readJson(request);
   const rec = body.slug ? await getDist(env, body.slug) : null;
@@ -9,8 +10,9 @@ export async function onRequestPost({ request, env }) {
   if ((await sha256hex(body.password || "")) !== rec.pw_hash) {
     return json({ ok: false, reason: "bad_password" }, 401);
   }
-  const cookie = await distSessionCookie(env, body.slug);
-  return json({ ok: true, name: rec.name, session: cookie }, 200, {
-    "set-cookie": `dsess=${cookie}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`,
+  const days = sessionDays(body);
+  const cookie = await distSessionCookie(env, body.slug, days);
+  return json({ ok: true, name: rec.name, session: cookie, days }, 200, {
+    "set-cookie": `dsess=${cookie}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${days * 86400}`,
   });
 }

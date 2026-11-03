@@ -59,6 +59,7 @@
     <div id="loginForm">
       <div class="row">
         <input id="pw" type="password" placeholder="分销商密码" style="flex:1;min-width:200px">
+        <select id="loginDays" title="密码保存天数"><option value="1">保存 1 天</option><option value="2">保存 2 天</option><option value="3">保存 3 天</option><option value="4">保存 4 天</option><option value="5">保存 5 天</option><option value="6">保存 6 天</option><option value="7">保存 7 天</option></select>
         <button id="loginBtn">登录</button>
       </div>
     </div>
@@ -67,6 +68,7 @@
       <div class="row">
         <input id="spw1" type="password" placeholder="设置密码" style="flex:1;min-width:160px">
         <input id="spw2" type="password" placeholder="再输一遍" style="flex:1;min-width:160px">
+        <select id="setupDays" title="密码保存天数"><option value="1">保存 1 天</option><option value="2">保存 2 天</option><option value="3">保存 3 天</option><option value="4">保存 4 天</option><option value="5">保存 5 天</option><option value="6">保存 6 天</option><option value="7">保存 7 天</option></select>
         <button id="setupBtn">设置密码并登录</button>
       </div>
     </div>
@@ -175,11 +177,12 @@ async function loadMe() {
   }
 }
 async function doLogin() {
+  const days = Number($("loginDays").value) || 1;
   const { status, data } = await api("/api/dist/login", {
-    method: "POST", body: JSON.stringify({ slug, password: $("pw").value }),
+    method: "POST", body: JSON.stringify({ slug, password: $("pw").value, days }),
   });
   if (status === 200 && data.ok) {
-    if (data.session) { try { localStorage.setItem("v2dsess", data.session); } catch {} }
+    if (data.session) { try { localStorage.setItem("v2dsess", data.session); localStorage.setItem("v2ddays", String(days)); } catch {} }
     loadMe();
   }
   else if (data.reason === "needs_setup") showSetup("请先设置你的登录密码");
@@ -187,6 +190,7 @@ async function doLogin() {
 }
 $("loginBtn").onclick = doLogin;
 $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+try { const d = localStorage.getItem("v2ddays"); if (d) { $("loginDays").value = d; $("setupDays").value = d; } } catch {}
 
 function showSetup(note) {
   $("loginForm").classList.add("hidden");
@@ -197,11 +201,12 @@ $("setupBtn").onclick = async () => {
   const p1 = $("spw1").value, p2 = $("spw2").value;
   if (p1.length < 6) { $("msg").textContent = "密码至少 6 位"; return; }
   if (p1 !== p2) { $("msg").textContent = "两次输入不一致"; return; }
+  const days = Number($("setupDays").value) || 1;
   const { status, data } = await api("/api/dist/setup", {
-    method: "POST", body: JSON.stringify({ slug, password: p1 }),
+    method: "POST", body: JSON.stringify({ slug, password: p1, days }),
   });
   if (status === 200 && data.ok) {
-    if (data.session) { try { localStorage.setItem("v2dsess", data.session); } catch {} }
+    if (data.session) { try { localStorage.setItem("v2dsess", data.session); localStorage.setItem("v2ddays", String(days)); } catch {} }
     loadMe();
   }
   else $("msg").textContent = "设置失败：" + (data.reason || "");
@@ -254,7 +259,7 @@ async function loadGuests() {
     <td>${g.username}<div class="muted">${g.note || ""}</div></td>
     <td class="mono" data-label="专属页面">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
     <td data-label="到期">${g.expires_at ? fmt(g.expires_at) : "—"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
-    <td data-label="状态">${st}${g.fetch && g.fetch.auto_disabled ? `<div style="color:#c0392b">自动停用：近7天出现在 ${g.fetch.auto_disabled.regions.length} 个省份<div class="muted">${g.fetch.auto_disabled.regions.join("、")}</div></div>` : ""}<div class="muted">拉取 ${g.fetch ? g.fetch.fetch_count : 0} 次${g.fetch && g.fetch.fetch_count ? ` · 最近 ${g.fetch.last_region || "?"} ${g.fetch.last_fetch_at ? fmt(g.fetch.last_fetch_at) : ""} · 近7天 ${g.fetch.regions_7d.length} 省` : ""}</div></td>
+    <td data-label="状态">${st}${g.fetch && g.fetch.auto_disabled ? `<div style="color:#c0392b">自动停用：近7天出现在 ${g.fetch.auto_disabled.regions.length} 个省份<div class="muted">${g.fetch.auto_disabled.regions.join("、")}</div></div>` : ""}<div class="muted">拉取 ${g.fetch ? g.fetch.fetch_count : 0} 次 · 今日 ${g.fetch ? g.fetch.fetch_day_count : 0}/10 次${g.fetch && g.fetch.fetch_count ? ` · 最近 ${g.fetch.last_region || "?"} ${g.fetch.last_fetch_at ? fmt(g.fetch.last_fetch_at) : ""} · 近7天 ${g.fetch.regions_7d.length} 省` : ""}${g.fetch && g.fetch.fetch_day_count >= 10 ? ` · <span style="color:#c0392b">今日超限已停，明日自动恢复</span>` : ""}</div></td>
     <td class="acts">${g.status === "disabled"
       ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>
          <button class="small danger" onclick="guestAct('${g.id}','delete')">删除</button>`
