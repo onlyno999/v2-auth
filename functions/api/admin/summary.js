@@ -1,17 +1,17 @@
-import { json, readJson, isAdmin, listStock } from "../../lib/core.js";
+import { json, readJson, isAdmin, tierForLevel } from "../../lib/core.js";
 import { buildTree } from "../../lib/tree.js";
 
 // The console's monthly bill (owner, 2026-11-04): a summary page
 // listing every DIRECT (level-1) distributor and what he owes
-// the console this month. The amount is his whole subtree's
-// month openings, duration-weighted into month units, times the
-// unit price — the ONE wholesale price the console charges its
-// level-1 distributors (owner settled it at 4 yuan per month
-// unit, 2026-11-04: retail is 10, the level-1 keeps 6 to feed
-// his tree; the console's volume is the whole tree's openings,
-// collected from the level-1s only). The price is one global
-// setting the owner can change on the page (meta:unitprice);
-// the code default applies until he saves one.
+// the console this month. The take is TIERED by the seller's
+// level (owner, 2026-11-04, correcting a flat-4 reading of vb's
+// guest): a level-1's own sale settles at the base price
+// (default 4), a level-2 sale at base-1, level 3 at base-2,
+// and anything deeper at 1 yuan — the ladder's floor, so the
+// console still earns on the deepest layer. The level-1's bill
+// is the sum over his whole subtree's month openings bucketed
+// by seller level; he alone settles with the console. The base
+// price is one global setting (meta:unitprice), default 4.
 const PRICE_KEY = "meta:unitprice";
 
 async function unitPrice(env) {
@@ -40,6 +40,9 @@ export async function onRequestGet({ request, env }) {
   for (const slug of roots) {
     const tree = await buildTree(env, slug);
     if (!tree) continue;
+    const breakdown = Object.entries(tree.stats.month.by_level || {})
+      .map(([lv, units]) => ({ level: Number(lv), units, rate: tierForLevel(price, Number(lv)), amount: Math.round(units * tierForLevel(price, Number(lv)) * 100) / 100 }))
+      .sort((a, b) => a.level - b.level);
     rows.push({
       slug,
       name: tree.dist.name || "",
@@ -48,7 +51,8 @@ export async function onRequestGet({ request, env }) {
       devices: tree.totals.devices,
       month_count: tree.stats.month.count,
       month_units: tree.stats.month.units,
-      due: Math.round(tree.stats.month.units * price * 100) / 100,
+      breakdown,
+      due: Math.round(breakdown.reduce((a, b) => a + b.amount, 0) * 100) / 100,
       total_units: tree.stats.total.units,
     });
   }
@@ -56,6 +60,7 @@ export async function onRequestGet({ request, env }) {
   return json({
     ok: true,
     unit_price: price,
+    tiers: [1, 2, 3, 4, 5].map((lv) => ({ level: lv, rate: tierForLevel(price, lv) })),
     rows,
     total_due: Math.round(rows.reduce((a, r) => a + r.due, 0) * 100) / 100,
     total_units: rows.reduce((a, r) => a + r.month_units, 0),

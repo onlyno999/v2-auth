@@ -91,12 +91,14 @@ async function load() {
   const { data } = await api("/api/dist/bill");
   if (!data.ok) { $("summary").textContent = "登录已失效，请返回重新登录。"; $("rows").innerHTML = ""; return; }
   if (data.my_price !== null) $("price").value = data.my_price;
-  $("floorHint").textContent = data.parent_price === null
+  $("floorHint").textContent = data.price_floor === null || data.price_floor === undefined
     ? "上级还没定价，你先定着；他定完价后，系统会按保底规则核你的价。"
-    : `你的进货价是 ¥${data.parent_price}/月。阶梯规矩：你的价最低定 ¥${data.parent_price + 1}，保底赚 1 块，低了存不了。往下每层再 +1，第 5 级卖到客户正好 10 块上下。`;
+    : `你下级卖出一单，你要往上交 ¥${data.cost_basis}/月。阶梯规矩：你的价最低定 ¥${data.price_floor}，保底赚 1 块，低了存不了。开几个月的单就按几个月算。`;
   const owe = data.owe_parent === null
     ? "上级还没定价，我的应付暂时算不出"
-    : `我本月应付上级（${data.parent === "admin" ? "总控制台" : data.parent}）：整棵树 ${data.my_units} 个月 × ¥${data.parent_price} = <b>${money(data.owe_parent)}</b>`;
+    : data.owe_breakdown
+      ? `我本月应付总控制台：<b>${money(data.owe_parent)}</b>（阶梯：${data.owe_breakdown.map((b) => `第${b.level}级 ${b.units} 个月×¥${b.rate}`).join(" ＋ ")}）`
+      : `我本月应付上级（${data.parent}）：整棵树 ${data.my_units} 个月 × ¥${data.parent_price} = <b>${money(data.owe_parent)}</b>`;
   $("summary").innerHTML = owe + (data.my_price === null
     ? "<br>先在上面把你卖给下级的价定下来，下面才会算出每个下级要交你多少。"
     : `<br>我的下级本月共应交我 <b>${money(data.total_due)}</b>`);

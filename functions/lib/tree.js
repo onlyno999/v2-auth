@@ -52,6 +52,7 @@ export async function buildTree(env, slug) {
     ).length;
     const totals = { devices: 0, guests: 0, subs: 0 };
     const members = new Set();
+    const levelOf = new Map([[slug, distLevel(root)]]);
     const census = {}; // absolute level -> descendant count
     const walk = async (s, seen) => {
       if (seen.has(s)) return;
@@ -63,6 +64,7 @@ export async function buildTree(env, slug) {
       totals.subs += kids.length;
       for (const k of kids) {
         const lv = distLevel(k.rec);
+        levelOf.set(k.slug, lv);
         census[lv] = (census[lv] || 0) + 1;
         await walk(k.slug, seen);
       }
@@ -79,7 +81,7 @@ export async function buildTree(env, slug) {
     const cutoff = nowSec() - 30 * 86400;
     const byDay = new Map();
     const statsTotal = { count: 0, units: 0, money: 0 };
-    const statsMonth = { count: 0, units: 0, money: 0 };
+    const statsMonth = { count: 0, units: 0, money: 0, by_level: {} };
     const tallyOpen = (dist, createdAt, durationSec, fallbackDays) => {
       if (!members.has(dist) || !createdAt) return;
       const units = quotaCostFor(durationSec || (fallbackDays || 30) * 86400);
@@ -87,6 +89,8 @@ export async function buildTree(env, slug) {
       const day = beijingDay(createdAt);
       if (day.startsWith(monthPrefix)) {
         statsMonth.count++; statsMonth.units += units; statsMonth.money += units * REF_PRICE;
+        const lv = levelOf.get(dist) || 0;
+        if (lv >= 1) statsMonth.by_level[lv] = (statsMonth.by_level[lv] || 0) + units;
       }
       if (createdAt >= cutoff) {
         const d = byDay.get(day) || { day, count: 0, units: 0, money: 0 };
