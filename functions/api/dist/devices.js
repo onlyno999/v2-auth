@@ -1,9 +1,14 @@
-import { json, distSlugFromRequest, getLicByKey } from "../../lib/core.js";
+import { json, distSlugFromRequest, getLicByKey, cachedPayload } from "../../lib/core.js";
 
 // GET -> only this distributor's own customers.
 export async function onRequestGet({ request, env }) {
   const slug = await distSlugFromRequest(env, request);
   if (!slug) return json({ ok: false, reason: "unauthorized" }, 401);
+  const out = await cachedPayload("dist:devices:" + slug, 20000, () => buildDevices(env, slug));
+  return json({ ok: true, devices: out });
+}
+
+async function buildDevices(env, slug) {
   const out = [];
   const devKeys = [];
   let cursor;
@@ -32,5 +37,5 @@ export async function onRequestGet({ request, env }) {
       },
     });
   }
-  return json({ ok: true, devices: out });
+  return out;
 }

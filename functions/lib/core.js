@@ -14,6 +14,25 @@ export const json = (obj, status = 200, extraHeaders = {}) =>
 
 export const nowSec = () => Math.floor(Date.now() / 1000);
 
+// ---------- list-quota guard ----------
+// KV list() carries a low daily quota (free plan: 1,000/day) and
+// the console table builders scan whole prefixes — a bad evening of
+// refreshes burned the whole day's quota and every list-backed
+// table died with "KV list() limit exceeded for the day". Built
+// payloads are cached in the isolate for a few seconds; every
+// record mutation funnels through the put* helpers below, which
+// bump the data version and invalidate the cache immediately.
+let _dataVersion = 0;
+export const bumpDataVersion = () => { _dataVersion++; };
+const _payloadCache = new Map();
+export async function cachedPayload(key, ttlMs, builder) {
+  const hit = _payloadCache.get(key);
+  if (hit && hit.v === _dataVersion && Date.now() - hit.at < ttlMs) return hit.val;
+  const val = await builder();
+  _payloadCache.set(key, { v: _dataVersion, at: Date.now(), val });
+  return val;
+}
+
 const enc = new TextEncoder();
 
 export async function sha256hex(text) {
@@ -107,6 +126,7 @@ export async function getLicByCode(env, code) {
   return raw ? { key: await codeKey(code), ...JSON.parse(raw) } : null;
 }
 export async function putLic(env, lic) {
+  bumpDataVersion();
   await env.V2.put(lic.key, JSON.stringify(lic.rec ?? lic));
 }
 export async function getLicByKey(env, key) {
@@ -118,6 +138,7 @@ export async function getDev(env, machineCode) {
   return raw ? JSON.parse(raw) : null;
 }
 export async function putDev(env, machineCode, dev) {
+  bumpDataVersion();
   await env.V2.put("dev:" + machineCode, JSON.stringify(dev));
 }
 export async function logEvent(env, kind, machineCode = "", detail = "") {
@@ -308,6 +329,7 @@ export async function getDist(env, slug) {
   return raw ? JSON.parse(raw) : null;
 }
 export async function putDist(env, slug, rec) {
+  bumpDataVersion();
   await env.V2.put("dist:" + slug, JSON.stringify(rec));
 }
 export const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,23}$/;
@@ -361,6 +383,7 @@ export async function getGuest(env, id) {
   return raw ? JSON.parse(raw) : null;
 }
 export async function putGuest(env, id, rec) {
+  bumpDataVersion();
   await env.V2.put("gst:" + id, JSON.stringify(rec));
 }
 export function newGuestId() {

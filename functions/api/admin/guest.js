@@ -1,5 +1,6 @@
 import {
   json, readJson, nowSec, isAdmin, sha256hex, getGuest, putGuest, newGuestId,
+  bumpDataVersion, cachedPayload,
   guestProblem, vaultSeal, SLUG_RE, parseDurationSec, parseDeltaSec, durationSeconds, fmtDuration,
 } from "../../lib/core.js";
 
@@ -10,25 +11,28 @@ import {
 // guest can only be deleted while disabled.
 export async function onRequestGet({ request, env }) {
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
-  const out = [];
-  const page = await env.V2.list({ prefix: "gst:", limit: 200 });
-  for (const k of page.keys) {
-    const raw = await env.V2.get(k.name);
-    if (!raw) continue; // KV eventual consistency: never render a ghost row
-    const rec = JSON.parse(raw);
-    out.push({
-      id: k.name.slice(4),
-      username: rec.username, note: rec.note || "", days: rec.days,
-      channel: rec.channel || "main", dist: rec.dist || null,
-      duration_sec: rec.duration_sec ?? null,
-      duration_text: fmtDuration(durationSeconds(rec)),
-      status: rec.status, created_at: rec.created_at, expires_at: rec.expires_at,
-      expired: rec.status !== "disabled" && !!guestProblem(rec),
-    });
-  }
-  // Oldest first: a newly added guest appends at the bottom of the
-  // list, in the order they were added.
-  out.sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+  const out = await cachedPayload("admin:guests", 20000, async () => {
+    const rows = [];
+    const page = await env.V2.list({ prefix: "gst:", limit: 200 });
+    for (const k of page.keys) {
+      const raw = await env.V2.get(k.name);
+      if (!raw) continue; // KV eventual consistency: never render a ghost row
+      const rec = JSON.parse(raw);
+      rows.push({
+        id: k.name.slice(4),
+        username: rec.username, note: rec.note || "", days: rec.days,
+        channel: rec.channel || "main", dist: rec.dist || null,
+        duration_sec: rec.duration_sec ?? null,
+        duration_text: fmtDuration(durationSeconds(rec)),
+        status: rec.status, created_at: rec.created_at, expires_at: rec.expires_at,
+        expired: rec.status !== "disabled" && !!guestProblem(rec),
+      });
+    }
+    // Oldest first: a newly added guest appends at the bottom of the
+    // list, in the order they were added.
+    rows.sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+    return rows;
+  });
   return json({ ok: true, guests: out });
 }
 
@@ -42,6 +46,7 @@ async function findByUsername(env, username) {
 }
 
 export async function onRequestPost({ request, env }) {
+  bumpDataVersion(); // any console mutation invalidates cached table payloads
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);
 

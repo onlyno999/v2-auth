@@ -1,12 +1,13 @@
 import {
   json, readJson, nowSec, distSlugFromRequest, getDist, putDist,
-  newLicenseCode, codeKey, logEvent, vaultSeal, normalizeMachineCode,
+  newLicenseCode, codeKey, logEvent, vaultSeal, normalizeMachineCode, bumpDataVersion,
 } from "../../lib/core.js";
 
 // POST {machineCode, days, note, mode}  (distributor session)
 // Issues a license stamped dist=<slug>, channel="dist".
 // Rules: days must be 1..365 (no permanent, max 1 year), quota enforced.
 export async function onRequestPost({ request, env }) {
+  bumpDataVersion(); // license write below bypasses putLic; invalidate cached tables
   const slug = await distSlugFromRequest(env, request);
   if (!slug) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);

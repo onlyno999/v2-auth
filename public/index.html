@@ -213,7 +213,9 @@ $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); }
 // deploy demanded the password despite a valid 30-day token.)
 (async () => {
   for (let i = 0; i < 4; i++) {
-    const { status, data } = await api("/api/admin/devices");
+    // Session check only (zero KV cost); the tables load once,
+    // inside enterConsole.
+    const { status, data } = await api("/api/admin/ping");
     if (data && data.ok) { enterConsole(); return; }
     if (status === 401) return;
     await new Promise((res) => setTimeout(res, 1500));

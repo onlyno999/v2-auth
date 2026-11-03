@@ -1,5 +1,6 @@
 import {
   json, readJson, nowSec, distSlugFromRequest, getDist, putDist, sha256hex,
+  bumpDataVersion,
   getGuest, putGuest, newGuestId, guestProblem, vaultSeal, SLUG_RE,
   parseDurationSec, durationSeconds, fmtDuration, logEvent,
 } from "../../lib/core.js";
@@ -46,6 +47,7 @@ export async function onRequestGet({ request, env }) {
 }
 
 export async function onRequestPost({ request, env }) {
+  bumpDataVersion(); // any console mutation invalidates cached table payloads
   const slug = await distSlugFromRequest(env, request);
   if (!slug) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);

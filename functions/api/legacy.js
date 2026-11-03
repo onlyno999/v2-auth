@@ -1,5 +1,5 @@
 import {
-  json, readJson, nowSec, codeKey, getLicByKey, logEvent,
+  json, readJson, nowSec, codeKey, getLicByKey, logEvent, bumpDataVersion,
 } from "../lib/core.js";
 import { finishActivation } from "./activate.js";
 
@@ -121,6 +121,7 @@ export async function onRequestPost({ request, env }) {
       expires_at: expiresAt,
     };
     await env.V2.put(key, JSON.stringify(lic));
+    bumpDataVersion();
   }
   await logEvent(env, "legacy_convert", body.machineCode);
   return finishActivation(env, lic, body);

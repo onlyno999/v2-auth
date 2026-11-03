@@ -1,25 +1,30 @@
 import {
   json, readJson, nowSec, isAdmin, sha256hex, getDist, putDist, SLUG_RE, RESERVED_SLUGS,
+  bumpDataVersion, cachedPayload,
 } from "../../lib/core.js";
 
 // GET -> all distributors. POST -> create / update / disable / enable.
 export async function onRequestGet({ request, env }) {
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
-  const out = [];
-  const page = await env.V2.list({ prefix: "dist:", limit: 200 });
-  for (const k of page.keys) {
-    const raw = await env.V2.get(k.name);
-    // KV is eventually consistent: a just-written key can list before
-    // its value is readable. Never render a ghost row from "{}" —
-    // skip it; it appears whole on the next refresh.
-    if (!raw) continue;
-    const rec = JSON.parse(raw);
-    out.push({ slug: k.name.slice(5), ...rec, pw_hash: undefined, has_pw: !!rec.pw_hash });
-  }
+  const out = await cachedPayload("admin:dist", 20000, async () => {
+    const rows = [];
+    const page = await env.V2.list({ prefix: "dist:", limit: 200 });
+    for (const k of page.keys) {
+      const raw = await env.V2.get(k.name);
+      // KV is eventually consistent: a just-written key can list before
+      // its value is readable. Never render a ghost row from "{}" —
+      // skip it; it appears whole on the next refresh.
+      if (!raw) continue;
+      const rec = JSON.parse(raw);
+      rows.push({ slug: k.name.slice(5), ...rec, pw_hash: undefined, has_pw: !!rec.pw_hash });
+    }
+    return rows;
+  });
   return json({ ok: true, distributors: out });
 }
 
 export async function onRequestPost({ request, env }) {
+  bumpDataVersion(); // any console mutation invalidates cached table payloads
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);
   const slug = (body.slug || "").toLowerCase();

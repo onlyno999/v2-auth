@@ -1,4 +1,4 @@
-import { json, isAdmin, vaultOpen, durationSeconds, fmtDuration } from "../../lib/core.js";
+import { json, isAdmin, vaultOpen, durationSeconds, fmtDuration, cachedPayload } from "../../lib/core.js";
 
 // Fetch every key under a prefix (paged).
 async function listKeys(env, prefix) {
@@ -20,9 +20,15 @@ async function getMany(env, keys) {
 // GET -> device table for the admin console. All KV reads are parallel:
 // on a slow client connection the response must complete fast, or the
 // phone gives up and shows 加载失败.
-export async function onRequestGet(ctx) {
+export async function onRequestGet({ request, env }) {
+  if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
   try {
-    return await buildDevices(ctx);
+    // The payload scans four KV prefixes; list() has a small daily
+    // quota, so serve the isolate-cached build (invalidated by any
+    // mutation via the data version) instead of re-listing on every
+    // console load and auto-login check.
+    const payload = await cachedPayload("admin:devices", 20000, () => buildDevices(env));
+    return json(payload);
   } catch (e) {
     // Surface the real error to the (admin-only) console instead of
     // dying as an opaque 500: the generic 加载失败 cell cost a long
@@ -31,8 +37,7 @@ export async function onRequestGet(ctx) {
   }
 }
 
-async function buildDevices({ request, env }) {
-  if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
+async function buildDevices(env) {
 
   const [devKeys, openKeys, licKeys] = await Promise.all([
     listKeys(env, "dev:"), listKeys(env, "open:"), listKeys(env, "lic:"),
@@ -102,10 +107,10 @@ async function buildDevices({ request, env }) {
     code: i.code_enc ? await vaultOpen(env, i.code_enc) : null,
   })));
   issued.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
-  return json({
+  return {
     ok: true,
     devices: out,
     pending_open: openKeys.map((k) => k.slice(5)),
     issued,
-  });
+  };
 }
