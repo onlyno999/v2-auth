@@ -48,6 +48,16 @@ export async function onRequestPost({ request, env }) {
       await logEvent(env, "admin_unbind", machine);
       return json({ ok: true });
     }
+    case "delete": {
+      // Hard delete: the device row, its license and any open claim
+      // all go. The machine is treated as never-activated afterwards
+      // (it would need a fresh code). Unlike revoke, nothing remains.
+      await env.V2.delete("dev:" + machine);
+      await env.V2.delete("open:" + machine);
+      if (licKey) await env.V2.delete(licKey);
+      await logEvent(env, "admin_delete_device", machine);
+      return json({ ok: true });
+    }
     case "extend": {
       if (!lic) return json({ ok: false, reason: "not_found" }, 404);
       if (!lic.expires_at) return json({ ok: false, reason: "permanent" }, 400);

@@ -230,5 +230,12 @@ const delOk = await j("/api/admin/dist", { slug: "abc", action: "delete" }, { co
 const state3 = await fetch(BASE + "/api/dist/state?slug=abc");
 check("disabled account deleted, slug gone", delOk.status === 200 && state3.status === 404);
 
+// device hard delete: row + license gone, token useless afterwards
+const delDev = await j("/api/admin/action", { machineCode: M, action: "delete" }, { cookie });
+const afterDel = await j("/api/admin/devices", null, { cookie, method: "GET" });
+check("device deleted from table", delDev.status === 200 && !afterDel.data.devices.some((d) => d.machine === M));
+const valAfterDel = await j("/api/validate", {}, { auth: "Bearer " + token });
+check("validate denied after device delete", valAfterDel.status === 403);
+
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);
 process.exit(fail ? 1 : 0);

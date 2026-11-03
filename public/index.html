@@ -182,6 +182,7 @@ $("openBtn").onclick = async () => {
 $("copyBtn").onclick = () => navigator.clipboard.writeText($("codeText").textContent);
 
 async function act(machine, action, days) {
+  if (action === "delete" && !confirm(`彻底删除设备 ${machine}？它会从总表消失、授权一并抹掉，不可恢复；这台机器再想用要重新发码。`)) return;
   const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action, days }) });
   if (!data.ok) alert("失败：" + (data.reason || ""));
   loadDevices();
@@ -246,6 +247,7 @@ async function loadDevices() {
           : `<button class="small danger" onclick="act('${d.machine}','revoke')">停用</button>`}
         <button class="small ghost" onclick="act('${d.machine}','unbind')">解绑</button>
         <button class="small ghost" onclick="act('${d.machine}','extend',30)">+30天</button>
+        <button class="small danger" onclick="act('${d.machine}','delete')">删除</button>
       </td></tr>`;
   }).join("");
 }
