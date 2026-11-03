@@ -7,6 +7,32 @@ import {
 export async function onRequestGet({ request, env }) {
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
   const out = await cachedPayload(env, "admin:dist", 20000, async () => {
+    // Tally each distributor's users (owner, 2026-11-04: the console
+    // must show how many users sit under each distributor):
+    // activated customers (active/revoked licenses), not-yet-claimed
+    // codes (issued/open), and his guest accounts.
+    const tally = new Map();
+    const bump = (slug, field) => {
+      if (!slug) return;
+      const t = tally.get(slug) || { devices: 0, pending: 0, guests: 0 };
+      t[field]++;
+      tally.set(slug, t);
+    };
+    for (const prefix of ["lic:", "gst:"]) {
+      let cursor;
+      do {
+        const page = await env.V2.list({ prefix, limit: 200, cursor });
+        cursor = page.list_complete ? undefined : page.cursor;
+        for (const k of page.keys) {
+          const raw = await env.V2.get(k.name);
+          if (!raw) continue;
+          const rec = JSON.parse(raw);
+          if (prefix === "gst:") bump(rec.dist, "guests");
+          else if (rec.status === "active" || rec.status === "revoked") bump(rec.dist, "devices");
+          else if (rec.status === "issued" || rec.status === "open") bump(rec.dist, "pending");
+        }
+      } while (cursor);
+    }
     const rows = [];
     const page = await env.V2.list({ prefix: "dist:", limit: 200 });
     for (const k of page.keys) {
@@ -16,7 +42,11 @@ export async function onRequestGet({ request, env }) {
       // skip it; it appears whole on the next refresh.
       if (!raw) continue;
       const rec = JSON.parse(raw);
-      rows.push({ slug: k.name.slice(5), ...rec, pw_hash: undefined, has_pw: !!rec.pw_hash });
+      const slug = k.name.slice(5);
+      rows.push({
+        slug, ...rec, pw_hash: undefined, has_pw: !!rec.pw_hash,
+        users: tally.get(slug) || { devices: 0, pending: 0, guests: 0 },
+      });
     }
     return rows;
   });

@@ -430,7 +430,7 @@ async function loadDists() {
   }
   $("distBody").innerHTML = data.distributors.map((d) => `<tr>
     <td class="mono" data-label="登录地址">${location.origin}/${d.slug}</td>
-    <td data-label="额度">${d.used} / ${d.quota < 0 ? "不限" : d.quota}</td>
+    <td data-label="额度">${d.used} / ${d.quota < 0 ? "不限" : d.quota}<div class="muted">客户 ${d.users ? d.users.devices : 0} 台${d.users && d.users.pending ? "（待激活 " + d.users.pending + "）" : ""} · 游客 ${d.users ? d.users.guests : 0} 个</div></td>
     <td data-label="状态">${!d.has_pw ? "待他设密码" : (d.status === "active" ? "正常" : "已停用")}</td>
     <td class="acts">${d.status === "active"
       ? `<button class="small danger" onclick="distAct('${d.slug}','disable')">停用</button>`
