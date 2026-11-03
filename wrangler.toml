@@ -2,6 +2,6 @@ name = "v2-auth"
 pages_build_output_dir = "public"
 compatibility_date = "2025-01-01"
 
-[[kv_namespaces]]
-binding = "KV"
-id = "00000000000000000000000000000000"
+# KV binding is configured in the Pages dashboard (Settings -> Bindings,
+# variable name: KV) so no namespace id lives in the repo.
+# Local dev uses: wrangler pages dev --kv KV
