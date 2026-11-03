@@ -68,6 +68,7 @@
       <button id="priceBtn" class="small">保存我的单价</button>
       <span id="priceMsg" class="muted"></span>
     </div>
+    <div id="floorHint" class="muted" style="margin-bottom:6px"></div>
     <div id="summary" class="muted" style="margin-bottom:10px">加载中…</div>
     <table>
       <thead><tr><th>我的下级</th><th>本月开通</th><th>折算月数</th><th>本月应交我</th></tr></thead>
@@ -90,6 +91,9 @@ async function load() {
   const { data } = await api("/api/dist/bill");
   if (!data.ok) { $("summary").textContent = "登录已失效，请返回重新登录。"; $("rows").innerHTML = ""; return; }
   if (data.my_price !== null) $("price").value = data.my_price;
+  $("floorHint").textContent = data.parent_price === null
+    ? "上级还没定价，你先定着；他定完价后，系统会按保底规则核你的价。"
+    : `你的进货价是 ¥${data.parent_price}/月。阶梯规矩：你的价最低定 ¥${data.parent_price + 1}，保底赚 1 块，低了存不了。往下每层再 +1，第 5 级卖到客户正好 10 块上下。`;
   const owe = data.owe_parent === null
     ? "上级还没定价，我的应付暂时算不出"
     : `我本月应付上级（${data.parent === "admin" ? "总控制台" : data.parent}）：整棵树 ${data.my_units} 个月 × ¥${data.parent_price} = <b>${money(data.owe_parent)}</b>`;
@@ -106,7 +110,9 @@ async function load() {
 $("priceBtn").onclick = async () => {
   const n = Number($("price").value);
   const { data } = await api("/api/dist/bill", { method: "POST", body: JSON.stringify({ price: n }) });
-  $("priceMsg").textContent = data.ok ? "已保存，下面的账已按新价算" : "单价不对";
+  $("priceMsg").textContent = data.ok ? "已保存，下面的账已按新价算"
+    : data.reason === "below_floor" ? `太低了：你的进货价 ¥${data.cost}，最低定 ¥${data.floor}（保底赚 1 块）`
+    : "单价不对";
   if (data.ok) load();
 };
 try {

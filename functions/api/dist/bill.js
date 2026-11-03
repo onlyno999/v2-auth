@@ -75,6 +75,21 @@ export async function onRequestPost({ request, env }) {
   if (!Number.isFinite(n) || n <= 0 || n > 10000) {
     return json({ ok: false, reason: "bad_price" }, 400);
   }
+  // Ladder floor (owner, 2026-11-04): pricing is his own business
+  // FROM level 1 down — but every layer must keep at least 1 yuan
+  // per unit, so a price may not sit below his own buying price
+  // + 1 (for a level-1 that is the console's fixed price + 1).
+  // When the parent has not priced yet his cost is unknowable
+  // and any price stands; the console parent always has a price.
+  let cost = null;
+  if (!rec.parent) cost = await consolePrice(env);
+  else {
+    const p = await getDist(env, rec.parent);
+    if (p && Number.isFinite(p.price) && p.price > 0) cost = p.price;
+  }
+  if (cost !== null && n < cost + 1) {
+    return json({ ok: false, reason: "below_floor", cost, floor: cost + 1 }, 400);
+  }
   await putDist(env, me, { ...rec, price: n });
   return json({ ok: true, price: n });
 }
