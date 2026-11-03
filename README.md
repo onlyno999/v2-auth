@@ -25,15 +25,18 @@ npm test                         # 全流程 24 项断言（需先 dev 起来）
 ```
 
 ## 上线（Cloudflare）
-1. 在 Cloudflare 建 KV 命名空间，把 id 填进 `wrangler.toml`。
-2. Pages 项目连接本仓库（构建输出目录 = `public`，无需构建命令）。
-3. Pages 项目设置里绑定：KV 绑定名 `V2`；密钥变量：
+注意：仓库里**故意没有 wrangler.toml**——它会在部署时覆盖后台设置，
+变量和绑定一律以 Pages 后台为准（2026-11-03 踩坑实证）。
+1. Pages 项目连接本仓库（构建输出目录 = `public`，无需构建命令）。
+2. 后台「绑定」（生产环境）：KV 命名空间，变量名 `V2`。
+3. 后台「变量和密钥」（生产环境）：
    `ADMIN_PASSWORD`（后台登录密码）、`SESSION_SECRET`（随机长串）、
    `ADMIN_SECRET`（可选，脚本调管理接口用）、`SUB_URL`（订阅真实地址）、
    `EXPECTED_PACKAGE`、`EXPECTED_CERT_SHA256`（官方签名证书 SHA-256）、
    `ATTEST_REQUIRED=1`（客户端带 Attestation 后再开）、
    `ATTEST_ROOT_SHA256`（可选，真实设备认证链根证书指纹，首台真机激活后锁定）。
-4. 绑定自有域名（pages.dev 在国内不稳，只作备用入口）。
+4. 改完变量/绑定后需重新部署一次才生效（推一次代码或重试最新部署）。
+5. 绑定自有域名（pages.dev 在国内不稳，只作备用入口）。
 
 ## 注意
 - `.dev.vars`、生产密钥永远不进仓库；订阅真实地址只存在于服务器密钥。
