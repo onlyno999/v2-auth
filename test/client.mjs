@@ -458,6 +458,14 @@ await j("/api/dist/guest", { id: DGID, action: "enable" }, { cookie: dgCookie })
 check("dist guest link revives on enable", (await fetch(dgMe.link)).status === 200);
 const dgList = await fetch(BASE + "/api/admin/guest", { headers: { cookie } }).then((r) => r.json());
 check("admin sees dist guest with owner", (dgList.guests || []).some((g) => g.id === DGID && g.dist === "ggg"));
+// the distributor's own guest list (x-dsess header auth, as the page
+// uses): the added guest is there, and a second one appends BELOW it
+const dgToken = dgCookie.slice("dsess=".length);
+const dgOwn1 = await fetch(BASE + "/api/dist/guest", { headers: { "x-dsess": dgToken } }).then((r) => r.json());
+check("dist guest list shows his guest", dgOwn1.ok === true && dgOwn1.guests.length === 1 && dgOwn1.guests[0].id === DGID);
+const dgCreate2 = await j("/api/dist/guest", { action: "create", username: "分销游客丙", password: "guest-pw-9", durationValue: 10, durationUnit: "day" }, { cookie: dgCookie });
+const dgOwn2 = await fetch(BASE + "/api/dist/guest", { headers: { "x-dsess": dgToken } }).then((r) => r.json());
+check("new guest appends at the bottom", dgCreate2.status === 200 && dgOwn2.guests.length === 2 && dgOwn2.guests[0].id === DGID && dgOwn2.guests[1].id === dgCreate2.data.id);
 
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);
 process.exit(fail ? 1 : 0);

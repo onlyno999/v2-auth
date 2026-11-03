@@ -26,7 +26,9 @@ export async function onRequestGet({ request, env }) {
       expired: rec.status !== "disabled" && !!guestProblem(rec),
     });
   }
-  out.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+  // Oldest first: a newly added guest appends at the bottom of the
+  // list, in the order they were added.
+  out.sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
   return json({ ok: true, guests: out });
 }
 

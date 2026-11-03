@@ -23,7 +23,9 @@ async function listOwnGuests(env, slug) {
     if (rec.dist !== slug) continue;
     out.push({ id: k.name.slice(4), rec });
   }
-  out.sort((a, b) => (b.rec.created_at || 0) - (a.rec.created_at || 0));
+  // Oldest first: a newly added guest appends at the bottom of the
+  // list, in the order they were added.
+  out.sort((a, b) => (a.rec.created_at || 0) - (b.rec.created_at || 0));
   return out;
 }
 
