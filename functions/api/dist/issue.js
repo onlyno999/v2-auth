@@ -1,6 +1,6 @@
 import {
   json, readJson, nowSec, distSlugFromRequest, getDist, putDist,
-  newLicenseCode, codeKey, logEvent,
+  newLicenseCode, codeKey, logEvent, vaultSeal,
 } from "../../lib/core.js";
 
 // POST {machineCode, days, note, mode}  (distributor session)
@@ -28,6 +28,7 @@ export async function onRequestPost({ request, env }) {
     note: body.note || "",
     channel: "dist",
     dist: slug,
+    code_enc: mode === "code" ? await vaultSeal(env, code) : null,
     created_at: nowSec(),
     activated_at: null,
     expires_at: null,

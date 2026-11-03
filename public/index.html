@@ -89,7 +89,7 @@
         <thead><tr><th>机器码 / 备注</th><th>天数</th><th>渠道</th><th>发出时间</th><th>状态</th><th>操作</th></tr></thead>
         <tbody id="issuedBody"><tr><td colspan="6" class="muted">加载中…</td></tr></tbody>
       </table>
-      <div class="muted" style="margin-top:8px">客户在客户端输码激活后，会自动出现在上面的设备总表里。激活码只在生成时显示一次，这里能看状态、能作废，但不能再把码看回来——码丢了就作废旧的、重新生成一个。</div>
+      <div class="muted" style="margin-top:8px">客户在客户端输码激活后，会自动出现在上面的设备总表里。新发的码带「复制码」按钮，随时能复制重发；更早发的老码只存了哈希、调不回来，丢了就作废旧的、重新生成一个。</div>
     </div>
 
     <h2>分销商管理</h2>
@@ -199,7 +199,7 @@ function renderIssued(list) {
     <td>${i.channel === "dist" ? "分销" + (i.dist ? "(" + i.dist + ")" : "") : "直营"}</td>
     <td>${fmt(i.created_at)}</td>
     <td>${i.status === "open" ? "已开通·待领取" : "未激活"}</td>
-    <td><button class="small danger" onclick="revokeCode('${i.licKey}')">作废</button></td></tr>`).join("");
+    <td>${i.code ? `<button class="small ghost" onclick="copyIssued('${i.code}')">复制码</button> ` : ""}<button class="small danger" onclick="revokeCode('${i.licKey}')">作废</button></td></tr>`).join("");
 }
 async function revokeCode(licKey) {
   if (!confirm("作废这个码？作废后客户就用不了了。")) return;
@@ -208,6 +208,11 @@ async function revokeCode(licKey) {
   loadDevices();
 }
 window.revokeCode = revokeCode;
+async function copyIssued(code) {
+  try { await navigator.clipboard.writeText(code); alert("已复制：" + code); }
+  catch { prompt("复制这个码：", code); }
+}
+window.copyIssued = copyIssued;
 
 async function loadDevices() {
   const { data } = await api("/api/admin/devices");

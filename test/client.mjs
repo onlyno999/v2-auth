@@ -95,6 +95,7 @@ check("code bound to other machine rejected", crossActivate.status === 403 && cr
 const listWithIssued = await (await fetch(BASE + "/api/admin/devices", { headers: { cookie } })).json();
 const issuedM2 = (listWithIssued.issued || []).find((i) => i.machine === M2);
 check("issued code listed before activation", !!issuedM2 && issuedM2.status === "issued");
+check("issued code re-copyable via vault", issuedM2.code === issue2.data.code, issuedM2.code);
 const killCode = await j("/api/admin/action", { licKey: issuedM2.licKey, action: "revoke" }, { cookie });
 const dev2x = await newDeviceKey();
 const deadActivate = await j("/api/activate", { machineCode: M2, code: issue2.data.code, pubkey: dev2x.pubkey });

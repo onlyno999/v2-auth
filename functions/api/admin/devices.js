@@ -1,4 +1,4 @@
-import { json, isAdmin } from "../../lib/core.js";
+import { json, isAdmin, vaultOpen } from "../../lib/core.js";
 
 // Fetch every key under a prefix (paged).
 async function listKeys(env, prefix) {
@@ -57,17 +57,25 @@ export async function onRequestGet({ request, env }) {
     };
   });
 
-  const issued = [];
+  const issuedRaw = [];
   for (const [k, lic] of licByKey) {
     if (lic.status === "issued" || lic.status === "open") {
-      issued.push({
+      issuedRaw.push({
         licKey: k,
         machine: lic.machine, note: lic.note || "", days: lic.days,
         channel: lic.channel || "main", dist: lic.dist || null,
         status: lic.status, created_at: lic.created_at,
+        code_enc: lic.code_enc || null,
       });
     }
   }
+  // Unseal the re-copyable codes (only those issued after the vault
+  // existed carry one; older codes stay hash-only and unrecoverable).
+  const issued = await Promise.all(issuedRaw.map(async (i) => ({
+    ...i,
+    code_enc: undefined,
+    code: i.code_enc ? await vaultOpen(env, i.code_enc) : null,
+  })));
   issued.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
   return json({
     ok: true,

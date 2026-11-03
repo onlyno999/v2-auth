@@ -49,6 +49,42 @@ export function newToken() {
   return b64urlEncode(rnd);
 }
 
+// ---------- code vault ----------
+// Newly issued codes also keep an AES-GCM sealed copy (key derived
+// from SESSION_SECRET) so the seller can re-copy a code he handed out
+// from the admin console. Lookup-by-code still uses only the SHA-256
+// hash; if SESSION_SECRET ever rotates, old sealed copies simply stop
+// decrypting and the copy button hides.
+async function vaultKey(env) {
+  const raw = await crypto.subtle.digest("SHA-256", enc.encode((env.SESSION_SECRET || "") + "|v2-code-vault"));
+  return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+}
+export async function vaultSeal(env, text) {
+  if (!env.SESSION_SECRET) return null;
+  try {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await vaultKey(env), enc.encode(text));
+    const buf = new Uint8Array(12 + ct.byteLength);
+    buf.set(iv);
+    buf.set(new Uint8Array(ct), 12);
+    return b64urlEncode(buf);
+  } catch {
+    return null;
+  }
+}
+export async function vaultOpen(env, sealed) {
+  if (!env.SESSION_SECRET || !sealed) return null;
+  try {
+    const buf = b64Decode(sealed);
+    const pt = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: buf.slice(0, 12) }, await vaultKey(env), buf.slice(12),
+    );
+    return new TextDecoder().decode(pt);
+  } catch {
+    return null;
+  }
+}
+
 // ---------- KV record access ----------
 export async function getLicByCode(env, code) {
   const raw = await env.V2.get(await codeKey(code));

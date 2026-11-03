@@ -1,5 +1,5 @@
 import {
-  json, readJson, nowSec, isAdmin, newLicenseCode, codeKey, logEvent,
+  json, readJson, nowSec, isAdmin, newLicenseCode, codeKey, logEvent, vaultSeal,
 } from "../../lib/core.js";
 
 // POST {machineCode, days, note, mode: "code"|"open"}  (admin)
@@ -19,6 +19,7 @@ export async function onRequestPost({ request, env }) {
     machine: body.machineCode,
     note: body.note || "",
     channel: body.channel === "dist" ? "dist" : "main",
+    code_enc: mode === "code" ? await vaultSeal(env, code) : null,
     created_at: nowSec(),
     activated_at: null,
     expires_at: null,
