@@ -73,7 +73,13 @@ export async function onRequestGet({ request, env }) {
         channel: lic.channel || "main", dist: lic.dist || null,
         status: lic.status, created_at: lic.created_at,
         code_enc: lic.code_enc || null,
-        attest_fail: failByMachine.get(lic.machine) || null,
+        // The refusal note is kept per machine; only show it on a
+        // license that already existed when the refusal happened —
+        // a freshly issued license must not inherit an old stamp.
+        attest_fail: (() => {
+          const f = failByMachine.get(lic.machine);
+          return f && f.at >= (lic.created_at || 0) ? f : null;
+        })(),
       });
     }
   }

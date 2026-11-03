@@ -47,6 +47,7 @@ export async function finishActivation(env, lic, body) {
     pulls: 0,
     integrity: null,
   });
+  await env.V2.delete("attestfail:" + machineCode);
   await logEvent(env, "activate", machineCode);
   return json({ ok: true, token, expires_at: expiresAt });
 }
