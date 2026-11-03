@@ -5,15 +5,19 @@ import { buildTree } from "../../lib/tree.js";
 // listing every DIRECT (level-1) distributor and what he owes
 // the console this month. The amount is his whole subtree's
 // month openings, duration-weighted into month units, times the
-// unit price (default 10 yuan — what he charges above that is
-// his own business). The price is one global setting the owner
-// can change on the page (meta:unitprice).
+// unit price — the ONE wholesale price the console charges its
+// level-1 distributors (owner settled it at 4 yuan per month
+// unit, 2026-11-04: retail is 10, the level-1 keeps 6 to feed
+// his tree; the console's volume is the whole tree's openings,
+// collected from the level-1s only). The price is one global
+// setting the owner can change on the page (meta:unitprice);
+// the code default applies until he saves one.
 const PRICE_KEY = "meta:unitprice";
 
 async function unitPrice(env) {
   const raw = await env.V2.get(PRICE_KEY);
   const n = raw ? Number(raw) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : 10;
+  return Number.isFinite(n) && n > 0 ? n : 4;
 }
 
 export async function onRequestGet({ request, env }) {
