@@ -152,7 +152,16 @@ const api = async (path, opts = {}) => {
 const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString("zh-CN", { hour12: false }) : "—";
 
 async function loadMe() {
-  const { data } = await api("/api/dist/me");
+  // Same rule as the admin console: a failed session CHECK (network
+  // blip, deployment swap) is not a logout — retry briefly; only a
+  // clean 401 leaves the login form up.
+  let data = {};
+  for (let i = 0; i < 4; i++) {
+    const r = await api("/api/dist/me");
+    data = r.data || {};
+    if (data.ok || r.status === 401) break;
+    await new Promise((res) => setTimeout(res, 1500));
+  }
   if (data.ok) {
     $("title").textContent = "分销商后台 · " + data.name;
     $("quotaLine").textContent = data.quota < 0

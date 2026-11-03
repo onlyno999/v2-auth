@@ -206,9 +206,17 @@ $("loginBtn").onclick = doLogin;
 $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 // Auto-login on load: if a still-valid session exists (cookie or the
 // stored token), go straight into the console — no password prompt.
+// A failed CHECK (network blip, deployment swap) is not a logout:
+// only a clean 401 leaves the login form up; anything else retries
+// for a few seconds first. (Field complaint: one refresh during a
+// deploy demanded the password despite a valid 30-day token.)
 (async () => {
-  const { data } = await api("/api/admin/devices");
-  if (data && data.ok) enterConsole();
+  for (let i = 0; i < 4; i++) {
+    const { status, data } = await api("/api/admin/devices");
+    if (data && data.ok) { enterConsole(); return; }
+    if (status === 401) return;
+    await new Promise((res) => setTimeout(res, 1500));
+  }
 })();
 
 function machineOk(v) {
