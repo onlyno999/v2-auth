@@ -184,6 +184,15 @@ async function loadMe() {
     if (data.ok || r.status === 401) break;
     await new Promise((res) => setTimeout(res, 1500));
   }
+  if (data.ok && slug && /^[a-z0-9][a-z0-9_-]{1,23}$/.test(slug) && data.slug !== slug) {
+    // This browser holds ANOTHER distributor's session (the owner
+    // testing links hits this constantly): a /<slug> page must
+    // land on ITS OWN account — drop the foreign session (cookie
+    // + stored token) and leave this slug's login form up.
+    try { localStorage.removeItem("v2dsess"); } catch {}
+    await api("/api/dist/logout", { method: "POST", body: "{}" });
+    return;
+  }
   if (data.ok) {
     $("title").textContent = "分销商后台 · " + data.name;
     $("quotaLine").textContent = data.quota < 0
