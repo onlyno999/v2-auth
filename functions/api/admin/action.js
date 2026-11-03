@@ -3,9 +3,10 @@ import {
   bumpDataVersion,
 } from "../../lib/core.js";
 
-// POST {machineCode, action: revoke|restore|unbind|extend|set_expiry,
-//       days?, expires_at?}  (admin). set_expiry writes an absolute
-// expiry (epoch seconds), or null for permanent.
+// POST {machineCode, action: revoke|restore|unbind|extend|set_expiry|
+//       set_note, days?, expires_at?, note?}  (admin). set_expiry writes
+// an absolute expiry (epoch seconds), or null for permanent; set_note
+// rewrites the license's customer-name note at any time.
 // Or {licKey, action: revoke} to kill an issued-but-unused code.
 export async function onRequestPost({ request, env }) {
   await bumpDataVersion(env); // any console mutation invalidates cached table payloads
@@ -105,6 +106,16 @@ export async function onRequestPost({ request, env }) {
       await putLic(env, { ...lic, expires_at, days });
       await logEvent(env, "admin_set_expiry", machine, String(expires_at));
       return json({ ok: true, expires_at, now: nowSec() });
+    }
+    case "set_note": {
+      // The note is the customer name （备注）: set at issue time, but
+      // fixable from the device row whenever it was forgotten or
+      // mistyped. It lives on the license record.
+      if (!lic) return json({ ok: false, reason: "not_found" }, 404);
+      const note = String(body.note ?? "").slice(0, 60);
+      await putLic(env, { ...lic, note });
+      await logEvent(env, "admin_set_note", machine, "");
+      return json({ ok: true, note });
     }
     default:
       return json({ ok: false, reason: "bad_action" }, 400);

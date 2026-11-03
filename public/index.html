@@ -101,10 +101,10 @@
     <div class="card">
       <table>
         <thead><tr>
-          <th>机器码 / 备注</th><th>平台</th><th>激活</th><th>到期</th>
+          <th>机器码</th><th>客户名</th><th>平台</th><th>激活</th><th>到期</th>
           <th>最近打开</th><th>拉取</th><th>状态</th><th>操作</th>
         </tr></thead>
-        <tbody id="tbody"><tr><td colspan="8" class="muted">加载中…</td></tr></tbody>
+        <tbody id="tbody"><tr><td colspan="9" class="muted">加载中…</td></tr></tbody>
       </table>
     </div>
 
@@ -293,6 +293,18 @@ async function editExpiry(machine, expiresAt) {
 }
 window.editExpiry = editExpiry;
 
+const devNoteMap = {};
+function esc(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+async function editNote(machine) {
+  const cur = devNoteMap[machine] || "";
+  const v = prompt(`客户名备注（当前：${cur || "未填"}）——发码时忘了填、填错了，都能在这里改：`, cur);
+  if (v === null) return;
+  const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action: "set_note", note: v.trim() }) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  loadDevices();
+}
+window.editNote = editNote;
+
 function renderIssued(list) {
   if (!list.length) {
     $("issuedBody").innerHTML = '<tr><td colspan="6" class="muted">还没有发出过码</td></tr>';
@@ -334,16 +346,18 @@ async function loadDevices() {
   } else pb.classList.add("hidden");
   renderIssued(data.issued || []);
   if (!data.devices.length) {
-    $("tbody").innerHTML = '<tr><td colspan="8" class="muted">还没有设备</td></tr>';
+    $("tbody").innerHTML = '<tr><td colspan="9" class="muted">还没有设备</td></tr>';
     return;
   }
   $("tbody").innerHTML = data.devices.map((d) => {
     const lic = d.lic || {};
+    devNoteMap[d.machine] = lic.note || "";
     const st = lic.status || "—";
     const boot = d.integrity && d.integrity.boot && d.integrity.boot.deviceLocked === false
       ? '<div class="muted" style="color:#b03a2e">设备已解锁/root 标记</div>' : "";
     return `<tr>
-      <td class="mono">${d.machine}<div class="muted">${lic.note || ""}${lic.channel === "dist" ? " · 分销" : ""}${lic.dist ? "(" + lic.dist + ")" : ""}</div>${boot}</td>
+      <td class="mono">${d.machine}<div class="muted">${lic.channel === "dist" ? "分销" : ""}${lic.dist ? "(" + lic.dist + ")" : ""}</div>${boot}</td>
+      <td data-label="客户名">${lic.note ? esc(lic.note) : '<span class="muted">未填</span>'}</td>
       <td data-label="平台">${d.platform || "—"}</td>
       <td data-label="激活">${fmt(lic.activated_at)}</td>
       <td data-label="到期">${lic.expires_at ? fmt(lic.expires_at) : (lic.days === 0 ? "永久" : "—")}</td>
@@ -356,6 +370,7 @@ async function loadDevices() {
           : `<button class="small danger" onclick="act('${d.machine}','revoke')">停用</button>`}
         <button class="small ghost" onclick="act('${d.machine}','unbind')">解绑</button>
         <button class="small ghost" onclick="editExpiry('${d.machine}', ${lic.expires_at || 0})">修改时间</button>
+        <button class="small ghost" onclick="editNote('${d.machine}')">备注</button>
         <button class="small danger" onclick="act('${d.machine}','delete')">删除</button>
       </td></tr>`;
   }).join("");
@@ -431,7 +446,7 @@ async function loadGuests() {
     <td>${g.username}<div class="muted">${g.note || ""}${g.channel === "dist" ? " · 分销" : ""}${g.dist ? "(" + g.dist + ")" : ""}</div></td>
     <td class="mono" data-label="专属页面">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
     <td data-label="到期">${g.expires_at ? fmt(g.expires_at) : "永久"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
-    <td data-label="状态">${st}${g.fetch && g.fetch.auto_disabled ? `<div style="color:#c0392b">自动停用：近7天出现在 ${g.fetch.auto_disabled.regions.length} 个省份<div class="muted">${g.fetch.auto_disabled.regions.join("、")}</div></div>` : ""}${g.fetch && g.fetch.fetch_count ? `<div class="muted">拉取 ${g.fetch.fetch_count} 次 · 最近 ${g.fetch.last_region || "?"} ${g.fetch.last_fetch_at ? fmt(g.fetch.last_fetch_at) : ""} · 近7天 ${g.fetch.regions_7d.length} 省</div>` : ""}</td>
+    <td data-label="状态">${st}${g.fetch && g.fetch.auto_disabled ? `<div style="color:#c0392b">自动停用：近7天出现在 ${g.fetch.auto_disabled.regions.length} 个省份<div class="muted">${g.fetch.auto_disabled.regions.join("、")}</div></div>` : ""}<div class="muted">拉取 ${g.fetch ? g.fetch.fetch_count : 0} 次${g.fetch && g.fetch.fetch_count ? ` · 最近 ${g.fetch.last_region || "?"} ${g.fetch.last_fetch_at ? fmt(g.fetch.last_fetch_at) : ""} · 近7天 ${g.fetch.regions_7d.length} 省` : ""}</div></td>
     <td class="acts">${g.status === "disabled"
       ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>
          <button class="small danger" onclick="guestAct('${g.id}','delete')">删除</button>`
