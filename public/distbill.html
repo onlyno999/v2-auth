@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>下级对账</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; background: #f4f5f7; color: #1c2333; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 20px; margin: 8px 0 16px; }
+  h2 { font-size: 15px; margin: 22px 0 10px; color: #334; }
+  .card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(20,30,60,.08); }
+  input, select { padding: 8px 10px; border: 1px solid #ccd2dd; border-radius: 6px; font-size: 14px; }
+  button { padding: 8px 14px; border: 0; border-radius: 6px; background: #14181f; color: #fff; font-size: 14px; cursor: pointer; }
+  button.ghost { background: #e8ebf0; color: #1c2333; }
+  button.danger { background: #c0392b; }
+  button.small { padding: 4px 9px; font-size: 12px; margin-right: 4px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #eceef2; vertical-align: top; }
+  th { color: #667; font-weight: 600; }
+  .mono { font-family: ui-monospace, Consolas, monospace; }
+  .code { font-size: 20px; font-weight: 700; letter-spacing: 1px; background: #fff8e6; border: 1px dashed #d9a441; padding: 10px 14px; border-radius: 8px; display: inline-block; }
+  .tag { padding: 1px 7px; border-radius: 9px; font-size: 12px; background: #e8f5e9; color: #22733a; }
+  .tag.revoked { background: #fdecea; color: #b03a2e; }
+  .tag.issued { background: #eef2fb; color: #33519c; }
+  .muted { color: #889; font-size: 12px; }
+  .hidden { display: none; }
+  #msg { margin: 10px 0; color: #b03a2e; min-height: 18px; }
+
+  /* Mobile (<=640px): tables turn into stacked cards — the header row
+     hides, each row becomes a bordered card whose cells render as
+     label/value lines (labels come from data-label in the row
+     templates), and action cells flow their buttons in a wrapping
+     row. Forms stack full-width. Desktop rendering is untouched. */
+  @media (max-width: 640px) {
+    .wrap { padding: 14px 10px 40px; }
+    .card { padding: 12px; }
+    .row { flex-direction: column; align-items: stretch; }
+    .row input, .row select, .row button { width: 100% !important; min-width: 0 !important; flex: none !important; box-sizing: border-box; }
+    .code { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; font-size: 17px; }
+    .mono { overflow-wrap: anywhere; }
+    table, tbody, tr, td, th { display: block; width: 100%; box-sizing: border-box; }
+    thead { display: none; }
+    tbody tr { border: 1px solid #e2e5ec; border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
+    tbody tr:last-child { margin-bottom: 0; }
+    td { border-bottom: 0; padding: 3px 0; overflow-wrap: anywhere; }
+    td[data-label] { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+    td[data-label]::before { content: attr(data-label); flex: 0 0 60px; color: #889; font-size: 12px; }
+    tbody td:first-child { font-size: 14px; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px dashed #eceef2; }
+    tbody td[colspan] { border-bottom: 0; margin-bottom: 0; padding-bottom: 3px; }
+    td.acts { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; }
+    td.acts button.small { margin: 0; padding: 7px 12px; font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="row" style="margin:14px 0">
+    <a id="homeBtn" href="#"><button class="ghost small">← 返回我的后台</button></a>
+  </div>
+  <h2>下级对账（本月）</h2>
+  <div class="card">
+    <div class="row" style="margin-bottom:10px">
+      <span>我卖给下级的价：每个月</span>
+      <input id="price" type="number" step="0.5" min="0" style="width:90px" placeholder="未设置">
+      <span>元</span>
+      <button id="priceBtn" class="small">保存我的单价</button>
+      <span id="priceMsg" class="muted"></span>
+    </div>
+    <div id="summary" class="muted" style="margin-bottom:10px">加载中…</div>
+    <table>
+      <thead><tr><th>我的下级</th><th>本月开通</th><th>折算月数</th><th>本月应交我</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="4" class="muted">加载中…</td></tr></tbody>
+    </table>
+    <div class="muted" style="margin-top:8px">算法跟总控制台一样：每个下级名下整棵树本月开的会员，按时长折算成月数（年卡 12 个月），乘以你定的价，就是他本月要交给你的钱。总控制台对你的价是定死的，你改不了；你对下级的价你自己定。</div>
+  </div>
+</div>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const sess = (() => { try { return localStorage.getItem("v2dsess"); } catch { return null; } })();
+async function api(path, opts = {}) {
+  const headers = { "content-type": "application/json", ...(sess ? { "x-dsess": sess } : {}) };
+  const res = await fetch(path, { ...opts, headers });
+  return { status: res.status, data: await res.json().catch(() => ({})) };
+}
+const money = (n) => "¥" + (Math.round(n * 100) / 100).toLocaleString("zh-CN");
+async function load() {
+  const { data } = await api("/api/dist/bill");
+  if (!data.ok) { $("summary").textContent = "登录已失效，请返回重新登录。"; $("rows").innerHTML = ""; return; }
+  if (data.my_price !== null) $("price").value = data.my_price;
+  const owe = data.owe_parent === null
+    ? "上级还没定价，我的应付暂时算不出"
+    : `我本月应付上级（${data.parent === "admin" ? "总控制台" : data.parent}）：整棵树 ${data.my_units} 个月 × ¥${data.parent_price} = <b>${money(data.owe_parent)}</b>`;
+  $("summary").innerHTML = owe + (data.my_price === null
+    ? "<br>先在上面把你卖给下级的价定下来，下面才会算出每个下级要交你多少。"
+    : `<br>我的下级本月共应交我 <b>${money(data.total_due)}</b>`);
+  $("rows").innerHTML = data.rows.length ? data.rows.map((r) => `<tr>
+    <td class="mono" data-label="我的下级"><a href="/subtree.html?slug=${r.slug}">${r.slug}</a><div class="muted">${r.name || ""}</div></td>
+    <td data-label="本月开通">${r.month_count} 个</td>
+    <td data-label="折算月数">${r.month_units} 个月</td>
+    <td data-label="本月应交我"><b>${money(r.due)}</b></td></tr>`).join("")
+    : '<tr><td colspan="4" class="muted">' + (data.my_price === null ? "先设置你的单价" : "还没有下级") + "</td></tr>";
+}
+$("priceBtn").onclick = async () => {
+  const n = Number($("price").value);
+  const { data } = await api("/api/dist/bill", { method: "POST", body: JSON.stringify({ price: n }) });
+  $("priceMsg").textContent = data.ok ? "已保存，下面的账已按新价算" : "单价不对";
+  if (data.ok) load();
+};
+try {
+  const payload = JSON.parse(atob(sess.split(".")[0].replace(/-/g, "+").replace(/_/g, "/")));
+  if (payload.dist) $("homeBtn").href = "/" + payload.dist;
+} catch {}
+load();
+</script>
+</body>
+</html>
