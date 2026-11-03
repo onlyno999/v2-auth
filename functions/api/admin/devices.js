@@ -1,4 +1,4 @@
-import { json, isAdmin, vaultOpen, durationSeconds, fmtDuration, cachedPayload } from "../../lib/core.js";
+import { json, isAdmin, vaultOpen, durationSeconds, spanDurationSeconds, fmtDuration, cachedPayload } from "../../lib/core.js";
 
 // Fetch every key under a prefix (paged).
 async function listKeys(env, prefix) {
@@ -68,7 +68,7 @@ async function buildDevices(env) {
         ? {
             status: lic.status, days: lic.days, note: lic.note || "",
             duration_sec: lic.duration_sec ?? null,
-            duration_text: fmtDuration(durationSeconds(lic)),
+            duration_text: fmtDuration(spanDurationSeconds(lic)),
             channel: lic.channel || "main", dist: lic.dist || null,
             created_at: lic.created_at, activated_at: lic.activated_at,
             expires_at: lic.expires_at,
@@ -85,7 +85,7 @@ async function buildDevices(env) {
         licKey: k,
         machine: lic.machine, note: lic.note || "", days: lic.days,
         duration_sec: lic.duration_sec ?? null,
-        duration_text: fmtDuration(durationSeconds(lic)),
+        duration_text: fmtDuration(spanDurationSeconds(lic)),
         channel: lic.channel || "main", dist: lic.dist || null,
         status: lic.status, created_at: lic.created_at,
         code_enc: lic.code_enc || null,

@@ -2,7 +2,7 @@ import {
   json, readJson, nowSec, distSlugFromRequest, getDist, putDist, sha256hex,
   bumpDataVersion,
   getGuest, putGuest, newGuestId, guestProblem, vaultSeal, SLUG_RE, guestLimitInput, guestFetchView, guestFetchReset,
-  parseDurationSec, durationSeconds, fmtDuration, logEvent,
+  parseDurationSec, durationSeconds, spanDurationSeconds, fmtDuration, logEvent,
 } from "../../lib/core.js";
 
 // Distributor-side guest accounts: a distributor adds his own
@@ -39,7 +39,7 @@ export async function onRequestGet({ request, env }) {
     guests: own.map(({ id, rec }) => ({
       id,
       username: rec.username, note: rec.note || "",
-      duration_text: fmtDuration(durationSeconds(rec)),
+      duration_text: fmtDuration(spanDurationSeconds(rec)),
       status: rec.status, created_at: rec.created_at, expires_at: rec.expires_at,
       expired: rec.status !== "disabled" && !!guestProblem(rec),
       fetch: guestFetchView(rec),

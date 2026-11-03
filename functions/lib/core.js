@@ -186,6 +186,19 @@ export function licProblem(lic, machineCode) {
 // duration_sec wins when present, else days*86400, else 0 = permanent.
 // Expiry is always computed in seconds, so a 5-minute license really
 // lives 300 seconds.
+// The duration a record effectively spans, for DISPLAY: once an
+// expiry exists, the span from its start (activation for licenses,
+// creation for guests) to that expiry is the truth — so editing
+// the expiry （修改时间） or extending immediately shows in the
+// consoles' 时长 column instead of the stale originally-granted
+// length (owner caught exactly that on a guest row, 2026-11-04).
+// Falls back to the granted duration before any expiry is set
+// (issued-not-activated licenses, permanent records).
+export function spanDurationSeconds(rec) {
+  const start = rec.activated_at || rec.created_at;
+  if (rec.expires_at && start) return Math.max(0, rec.expires_at - start);
+  return durationSeconds(rec);
+}
 export function durationSeconds(rec) {
   if (rec && Number.isFinite(rec.duration_sec) && rec.duration_sec > 0) {
     return Math.floor(rec.duration_sec);

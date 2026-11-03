@@ -1,7 +1,7 @@
 import {
   json, readJson, nowSec, isAdmin, sha256hex, getGuest, putGuest, newGuestId,
   bumpDataVersion, cachedPayload, guestFetchView, guestFetchReset,
-  guestProblem, vaultSeal, SLUG_RE, guestLimitInput, parseDurationSec, parseDeltaSec, durationSeconds, fmtDuration,
+  guestProblem, vaultSeal, SLUG_RE, guestLimitInput, parseDurationSec, parseDeltaSec, durationSeconds, spanDurationSeconds, fmtDuration,
 } from "../../lib/core.js";
 
 // GET -> all guests. POST -> create / disable / enable / extend /
@@ -23,7 +23,7 @@ export async function onRequestGet({ request, env }) {
         username: rec.username, note: rec.note || "", days: rec.days,
         channel: rec.channel || "main", dist: rec.dist || null,
         duration_sec: rec.duration_sec ?? null,
-        duration_text: fmtDuration(durationSeconds(rec)),
+        duration_text: fmtDuration(spanDurationSeconds(rec)),
         status: rec.status, created_at: rec.created_at, expires_at: rec.expires_at,
         expired: rec.status !== "disabled" && !!guestProblem(rec),
         fetch: guestFetchView(rec),
