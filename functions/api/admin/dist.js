@@ -72,6 +72,39 @@ export async function onRequestPost({ request, env }) {
         await putDist(env, slug, { ...rec, name });
       }
       return json({ ok: true });
+    case "reslug": {
+      // Change the login identifier itself (owner's request): the
+      // record moves to the new key — name, password hash, quota,
+      // usage and status all travel; only his /<slug> login link
+      // changes and the old address dies. Licenses and guests he
+      // already issued are re-stamped so every console keeps
+      // attributing them to him under the new slug.
+      const next = (body.new_slug || "").toLowerCase();
+      if (!SLUG_RE.test(next) || RESERVED_SLUGS.has(next)) {
+        return json({ ok: false, reason: "bad_slug" }, 400);
+      }
+      if (next === slug) return json({ ok: true, slug });
+      if (await getDist(env, next)) return json({ ok: false, reason: "exists" }, 409);
+      await putDist(env, next, { ...rec });
+      await env.V2.delete("dist:" + slug);
+      for (const prefix of ["lic:", "gst:"]) {
+        let cursor;
+        do {
+          const page = await env.V2.list({ prefix, limit: 200, cursor });
+          cursor = page.list_complete ? undefined : page.cursor;
+          for (const k of page.keys) {
+            const raw = await env.V2.get(k.name);
+            if (!raw) continue;
+            const item = JSON.parse(raw);
+            if (item.dist === slug) {
+              item.dist = next;
+              await env.V2.put(k.name, JSON.stringify(item));
+            }
+          }
+        } while (cursor);
+      }
+      return json({ ok: true, slug: next });
+    }
     case "quota":
       await putDist(env, slug, { ...rec, quota: Math.floor(body.quota ?? rec.quota) });
       return json({ ok: true });

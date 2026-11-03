@@ -398,6 +398,7 @@ async function loadDists() {
          <button class="small danger" onclick="distAct('${d.slug}','delete')">删除账户</button>`}
       <button class="small ghost" onclick="distAct('${d.slug}','resetpw')">重置密码</button>
       <button class="small ghost" onclick="distAct('${d.slug}','rename')">改名</button>
+      <button class="small ghost" onclick="distAct('${d.slug}','reslug')">标识</button>
       <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button></td>
     <td class="mono" data-label="标识 / 名称">${d.slug}<div class="muted">${d.name || ""}</div></td></tr>`).join("");
 }
@@ -411,12 +412,17 @@ async function distAct(slug, action) {
     body.quota = Number(q);
   }
   if (action === "rename") {
-    const n = prompt(`分销商 ${slug} 的新名称：`);
+    const n = prompt(`分销商 ${slug} 的新名称（用户名）：`);
     if (n === null || !n.trim()) return;
     body.name = n.trim();
   }
+  if (action === "reslug") {
+    const n = prompt(`把 ${slug} 的登录标识改成（小写字母/数字/-/_，2–24 位）：\n改完他的登录地址变成 ${location.origin}/新标识，旧地址立即失效；密码、额度、客户都不变。`);
+    if (n === null || !n.trim()) return;
+    body.new_slug = n.trim().toLowerCase();
+  }
   const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify(body) });
-  if (!data.ok) alert("失败：" + (data.reason || ""));
+  if (!data.ok) alert("失败：" + (data.reason === "exists" ? "这个标识已被占用" : data.reason === "bad_slug" ? "标识格式不对" : data.reason || ""));
   loadDists();
 }
 window.distAct = distAct;
