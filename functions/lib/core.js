@@ -229,7 +229,7 @@ export async function putDist(env, slug, rec) {
   await env.V2.put("dist:" + slug, JSON.stringify(rec));
 }
 export const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,23}$/;
-export const RESERVED_SLUGS = new Set(["api", "index", "dist", "admin", "assets"]);
+export const RESERVED_SLUGS = new Set(["api", "index", "dist", "admin", "assets", "guest", "s"]);
 
 export async function distSessionCookie(env, slug) {
   const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 24 * 30, dist: slug })));

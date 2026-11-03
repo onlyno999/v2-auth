@@ -12,7 +12,7 @@ function channelCfg(env, channel) {
   return { url: env.SUB_URL, prefix: "sub" };
 }
 
-async function serveSubscription(env, channel) {
+export async function serveSubscription(env, channel) {
   const { url, prefix } = channelCfg(env, channel);
   let content = await env.V2.get(prefix + ":content");
   const fetchedAt = parseInt((await env.V2.get(prefix + ":fetched_at")) || "0", 10);

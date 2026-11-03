@@ -240,6 +240,24 @@ check("device deleted from table", delDev.status === 200 && !(afterDel.devices |
 const valAfterDel = await j("/api/validate", { machineCode: M1, token: act1.data.token });
 check("validate denied after device delete", valAfterDel.status === 403);
 
+// ---- guest subscription link (Shadowrocket etc.) ----
+const gIssue = await j("/api/admin/issue", { machineCode: "GUEST-USER-001", days: 30, note: "小火箭客户", mode: "code" }, { cookie });
+const gLink = await j("/api/guest/link", { code: gIssue.data.code });
+check("guest link issued", gLink.status === 200 && typeof gLink.data.link === "string" && gLink.data.link.includes("/s/"), JSON.stringify(gLink.data).slice(0, 90));
+const gFetch = await fetch(gLink.data.link);
+const gBody = await gFetch.text();
+const expectedSub = readFileSync(new URL("./fixtures/sub_main.txt", import.meta.url), "utf8");
+check("guest link serves subscription content", gFetch.status === 200 && gBody === expectedSub, gBody.slice(0, 40));
+const gTable = await (await fetch(BASE + "/api/admin/devices", { headers: { cookie } })).json();
+check("guest customer visible in device table", (gTable.devices || []).some((d) => d.machine === "GUEST-USER-001" && d.lic && d.lic.status === "active"));
+const gBad = await fetch(BASE + "/s/AAAAbbbbCCCCdddd");
+check("tampered guest link rejected", gBad.status === 404);
+const gWrongCode = await j("/api/guest/link", { code: "V2O-XXXXX-XXXXX-XXXXX-XXXXX" });
+check("guest link with unknown code rejected", gWrongCode.status === 404);
+await j("/api/admin/action", { machineCode: "GUEST-USER-001", action: "revoke" }, { cookie });
+const gAfterRevoke = await fetch(gLink.data.link);
+check("guest link dead after revoke", gAfterRevoke.status === 403);
+
 // ---- legacy offline-code conversion (fixture key; skipped if absent) ----
 import { readFileSync } from "node:fs";
 let legacyFx = null;

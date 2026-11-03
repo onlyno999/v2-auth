@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>获取我的订阅链接</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; background: #f4f5f7; color: #1c2333; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 28px 16px 48px; }
+  h1 { font-size: 20px; margin: 8px 0 6px; }
+  .card { background: #fff; border-radius: 10px; padding: 18px 16px; box-shadow: 0 1px 3px rgba(20,30,60,.08); }
+  input { padding: 10px; border: 1px solid #ccd2dd; border-radius: 6px; font-size: 15px; width: 100%; box-sizing: border-box; }
+  button { padding: 10px 16px; border: 0; border-radius: 6px; background: #14181f; color: #fff; font-size: 15px; cursor: pointer; }
+  button.ghost { background: #e8ebf0; color: #1c2333; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .link { font-family: ui-monospace, Consolas, monospace; font-size: 13px; word-break: break-all; background: #fff8e6; border: 1px dashed #d9a441; padding: 10px 12px; border-radius: 8px; }
+  .muted { color: #889; font-size: 13px; line-height: 1.7; }
+  #msg { margin: 10px 0; color: #b03a2e; min-height: 18px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>获取我的订阅链接</h1>
+  <div class="muted">把卖家给你的激活码粘贴到下面，就能拿到你自己的专属订阅链接。把链接粘贴到小火箭（Shadowrocket）等软件的订阅里，就能导入节点。</div>
+
+  <div class="card" style="margin-top:14px">
+    <input id="code" placeholder="在此粘贴激活码（V2O- 开头）" autocomplete="off">
+    <div class="row">
+      <button id="goBtn">获取订阅链接</button>
+    </div>
+    <div id="msg"></div>
+    <div id="result" class="hidden">
+      <div class="link" id="linkText"></div>
+      <div class="row">
+        <button id="copyBtn" class="ghost">复制链接</button>
+        <span class="muted" id="expText"></span>
+      </div>
+      <div class="muted" style="margin-top:10px">
+        使用方法（小火箭）：打开小火箭 → 右上角 + → 类型选 Subscribe（订阅）→ 把上面的链接粘贴到 URL 里 → 完成。以后节点更新，在小火箭里点订阅更新即可，不用再来这里。<br>
+        注意：这个链接只属于你一个人，别转发给别人；卖家停用或到期后，链接会自动失效。
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const REASONS = {
+  not_found: "激活码不对，检查一下有没有粘错",
+  bad_request: "先粘贴激活码",
+  revoked: "这个激活码已被停用，请联系卖家",
+  expired: "这个激活码已过期，请联系卖家续期",
+  not_issued: "这个激活码还不能用，请联系卖家",
+  bound_other: "激活码与账号不匹配，请联系卖家",
+  rate_limited: "试得太多了，过一会儿再来",
+};
+$("goBtn").onclick = async () => {
+  const code = $("code").value.trim();
+  $("msg").textContent = "";
+  $("result").classList.add("hidden");
+  if (!code) { $("msg").textContent = REASONS.bad_request; return; }
+  $("goBtn").disabled = true;
+  try {
+    const r = await fetch("/api/guest/link", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (data.ok && data.link) {
+      $("linkText").textContent = data.link;
+      $("expText").textContent = data.expires_at
+        ? "到期时间：" + new Date(data.expires_at * 1000).toLocaleString("zh-CN", { hour12: false })
+        : "永久有效";
+      $("result").classList.remove("hidden");
+    } else {
+      $("msg").textContent = REASONS[data.reason] || ("失败：" + (data.reason || "未知错误"));
+    }
+  } catch (e) {
+    $("msg").textContent = "网络连接失败，请检查网络后重试";
+  }
+  $("goBtn").disabled = false;
+};
+$("copyBtn").onclick = async () => {
+  const text = $("linkText").textContent;
+  try { await navigator.clipboard.writeText(text); $("copyBtn").textContent = "已复制"; }
+  catch { prompt("复制这个链接：", text); }
+  setTimeout(() => { $("copyBtn").textContent = "复制链接"; }, 1600);
+};
+</script>
+</body>
+</html>
