@@ -116,10 +116,17 @@ const $ = (id) => document.getElementById(id);
 const api = async (path, opts = {}) => {
   // GETs auto-retry: on a flaky phone connection a single dropped
   // request used to leave the tables stuck on 加载失败.
+  // The session token rides in localStorage (x-session header) as well
+  // as the cookie: a refresh must never ask for the password again
+  // while the token (30 days) is still valid.
+  const sess = (() => { try { return localStorage.getItem("v2sess"); } catch { return null; } })();
   const tries = !opts.method || opts.method === "GET" ? 3 : 1;
   for (let i = 0; i < tries; i++) {
     try {
-      const r = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
+      const r = await fetch(path, {
+        headers: { "content-type": "application/json", ...(sess ? { "x-session": sess } : {}) },
+        ...opts,
+      });
       return { status: r.status, data: await r.json().catch(() => ({})) };
     } catch (e) {
       if (i === tries - 1) return { status: 0, data: { ok: false, reason: "network" } };
@@ -129,21 +136,31 @@ const api = async (path, opts = {}) => {
 };
 const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString("zh-CN", { hour12: false }) : "—";
 
+function enterConsole() {
+  $("loginBox").classList.add("hidden");
+  $("console").classList.remove("hidden");
+  loadDevices();
+  loadDists();
+}
 async function doLogin() {
   const { status, data } = await api("/api/admin/login", {
     method: "POST", body: JSON.stringify({ password: $("pw").value }),
   });
   if (status === 200 && data.ok) {
-    $("loginBox").classList.add("hidden");
-    $("console").classList.remove("hidden");
-    loadDevices();
-    loadDists();
+    if (data.session) { try { localStorage.setItem("v2sess", data.session); } catch {} }
+    enterConsole();
   } else {
     $("msg").textContent = "密码不对";
   }
 }
 $("loginBtn").onclick = doLogin;
 $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+// Auto-login on load: if a still-valid session exists (cookie or the
+// stored token), go straight into the console — no password prompt.
+(async () => {
+  const { data } = await api("/api/admin/devices");
+  if (data && data.ok) enterConsole();
+})();
 
 $("issueBtn").onclick = async () => {
   const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), channel: $("channel").value, mode: "code" };

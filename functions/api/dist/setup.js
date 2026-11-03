@@ -13,7 +13,7 @@ export async function onRequestPost({ request, env }) {
   }
   await putDist(env, body.slug, { ...rec, pw_hash: await sha256hex(String(body.password)) });
   const cookie = await distSessionCookie(env, body.slug);
-  return json({ ok: true, name: rec.name }, 200, {
-    "set-cookie": `dsess=${cookie}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=604800`,
+  return json({ ok: true, name: rec.name, session: cookie }, 200, {
+    "set-cookie": `dsess=${cookie}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`,
   });
 }

@@ -157,6 +157,16 @@ check("device table lists devices", devList.ok && devList.devices.length >= 2, `
 const noAuthList = await fetch(BASE + "/api/admin/devices").then((r) => r.status);
 check("device table requires login", noAuthList === 401);
 
+// session token via header (localStorage path): refresh must not
+// demand the password again while the token is valid.
+const login2 = await j("/api/admin/login", { password: "liantong-test-pw" });
+const sessToken = login2.data.session;
+check("login returns session token", login2.status === 200 && typeof sessToken === "string" && sessToken.includes("."));
+const headerAuth = await fetch(BASE + "/api/admin/devices", { headers: { "x-session": sessToken } });
+check("x-session header authenticates", headerAuth.status === 200);
+const badHeaderAuth = await fetch(BASE + "/api/admin/devices", { headers: { "x-session": "bogus.token" } });
+check("bogus x-session rejected", badHeaderAuth.status === 401);
+
 // ---------- 3. distributor portal (/mmm) ----------
 const createDist = await j("/api/admin/dist", { action: "create", slug: "mmm", name: "分销老王", password: "dist-pw-1", quota: 2 }, { cookie });
 check("admin creates distributor", createDist.status === 200 && createDist.data.ok === true);

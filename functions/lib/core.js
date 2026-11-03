@@ -140,7 +140,7 @@ export async function gate(env, machineCode, body, path) {
 
 // ---------- admin session ----------
 export async function sessionCookie(env, req) {
-  const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 12, admin: true })));
+  const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 24 * 30, admin: true })));
   const mac = await hmac(env.SESSION_SECRET, payload);
   return `${payload}.${mac}`;
 }
@@ -152,10 +152,16 @@ export async function hmac(secret, text) {
 export async function isAdmin(env, request) {
   const headerSecret = request.headers.get("x-admin-secret");
   if (headerSecret && env.ADMIN_SECRET && headerSecret === env.ADMIN_SECRET) return true;
+  if (!env.SESSION_SECRET) return false;
+  // Session token arrives either as the sess cookie or as an x-session
+  // header (the console stores it in localStorage too: some networks /
+  // browsers drop cookies, and a refresh must not demand the password
+  // again while the token is still valid).
   const cookie = request.headers.get("cookie") || "";
   const m = cookie.match(/sess=([^;]+)/);
-  if (!m || !env.SESSION_SECRET) return false;
-  const [payload, mac] = m[1].split(".");
+  const token = (m && m[1]) || request.headers.get("x-session");
+  if (!token) return false;
+  const [payload, mac] = token.split(".");
   if (!payload || !mac) return false;
   if ((await hmac(env.SESSION_SECRET, payload)) !== mac) return false;
   try {
@@ -190,15 +196,17 @@ export const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,23}$/;
 export const RESERVED_SLUGS = new Set(["api", "index", "dist", "admin", "assets"]);
 
 export async function distSessionCookie(env, slug) {
-  const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 24 * 7, dist: slug })));
+  const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 24 * 30, dist: slug })));
   const mac = await hmac(env.SESSION_SECRET, payload);
   return `${payload}.${mac}`;
 }
 export async function distSlugFromRequest(env, request) {
+  if (!env.SESSION_SECRET) return null;
   const cookie = request.headers.get("cookie") || "";
   const m = cookie.match(/dsess=([^;]+)/);
-  if (!m || !env.SESSION_SECRET) return null;
-  const [payload, mac] = m[1].split(".");
+  const token = (m && m[1]) || request.headers.get("x-dsess");
+  if (!token) return null;
+  const [payload, mac] = token.split(".");
   if (!payload || !mac) return null;
   if ((await hmac(env.SESSION_SECRET, payload)) !== mac) return null;
   try {

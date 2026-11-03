@@ -7,7 +7,10 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: false, reason: "bad_password" }, 401);
   }
   const cookie = await sessionCookie(env, request);
-  return json({ ok: true }, 200, {
-    "set-cookie": `sess=${cookie}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=43200`,
+  // The token is also returned in the body: the console keeps it in
+  // localStorage and sends it as x-session, so a refresh never asks
+  // for the password again while it is valid (30 days).
+  return json({ ok: true, session: cookie }, 200, {
+    "set-cookie": `sess=${cookie}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=2592000`,
   });
 }

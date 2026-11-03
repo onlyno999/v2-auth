@@ -87,10 +87,14 @@
 const $ = (id) => document.getElementById(id);
 const slug = location.pathname.replace(/\//g, "");
 const api = async (path, opts = {}) => {
+  const sess = (() => { try { return localStorage.getItem("v2dsess"); } catch { return null; } })();
   const tries = !opts.method || opts.method === "GET" ? 3 : 1;
   for (let i = 0; i < tries; i++) {
     try {
-      const r = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
+      const r = await fetch(path, {
+        headers: { "content-type": "application/json", ...(sess ? { "x-dsess": sess } : {}) },
+        ...opts,
+      });
       return { status: r.status, data: await r.json().catch(() => ({})) };
     } catch (e) {
       if (i === tries - 1) return { status: 0, data: { ok: false, reason: "network" } };
@@ -116,7 +120,10 @@ async function doLogin() {
   const { status, data } = await api("/api/dist/login", {
     method: "POST", body: JSON.stringify({ slug, password: $("pw").value }),
   });
-  if (status === 200 && data.ok) loadMe();
+  if (status === 200 && data.ok) {
+    if (data.session) { try { localStorage.setItem("v2dsess", data.session); } catch {} }
+    loadMe();
+  }
   else if (data.reason === "needs_setup") showSetup("请先设置你的登录密码");
   else $("msg").textContent = data.reason === "no_distributor" ? "此地址不存在或已被停用" : "密码不对";
 }
@@ -135,7 +142,10 @@ $("setupBtn").onclick = async () => {
   const { status, data } = await api("/api/dist/setup", {
     method: "POST", body: JSON.stringify({ slug, password: p1 }),
   });
-  if (status === 200 && data.ok) loadMe();
+  if (status === 200 && data.ok) {
+    if (data.session) { try { localStorage.setItem("v2dsess", data.session); } catch {} }
+    loadMe();
+  }
   else $("msg").textContent = "设置失败：" + (data.reason || "");
 };
 
