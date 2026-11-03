@@ -318,9 +318,26 @@ check("disabled guest session rejected", gMeOff.status === 401);
 await j("/api/admin/guest", { id: GID, action: "enable" }, { cookie });
 check("guest link back after enable", (await fetch(gMe.link)).status === 200);
 await j("/api/admin/guest", { id: GID, action: "extend", days: -10000 }, { cookie });
-check("expired guest link dead", (await fetch(gMe.link)).status === 403);
+check("long-expired guest link hard-dead", (await fetch(gMe.link)).status === 403);
+// Expired TODAY (moments ago): the poisoned subscription is served.
+await j("/api/admin/guest", { id: GID, action: "set_expiry", expires_at: Math.floor(Date.now() / 1000) - 120 }, { cookie });
+const gExpiredFetch = await fetch(gMe.link);
+const gExpiredBody = await gExpiredFetch.text();
+let gPoisonText = "";
+try {
+  gPoisonText = Buffer.from(gExpiredBody.replace(/\s+/g, ""), "base64").toString("utf8");
+} catch { /* not base64: stays empty and the checks below fail loudly */ }
+const gStrayIps = (gPoisonText.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []).filter((x) => x !== "114.115.116.117");
+check("guest expired today gets poisoned subscription (200, every address the dead IP)",
+  gExpiredFetch.status === 200 && gPoisonText.includes("114.115.116.117") && gStrayIps.length === 0,
+  `stray=${gStrayIps.length}`);
+// Expired since a previous day: nothing at all.
+await j("/api/admin/guest", { id: GID, action: "set_expiry", expires_at: Math.floor(Date.now() / 1000) - 90000 }, { cookie });
+check("guest expired before today: link serves nothing", (await fetch(gMe.link)).status === 403);
 await j("/api/admin/guest", { id: GID, action: "extend", days: 10001 }, { cookie });
-check("extended guest link alive again", (await fetch(gMe.link)).status === 200);
+const gRevived = await fetch(gMe.link);
+check("extended guest link alive again with real content",
+  gRevived.status === 200 && (await gRevived.text()) === expectedSub);
 await j("/api/admin/guest", { id: GID, action: "password", password: "guest-pw-9" }, { cookie });
 check("old guest password dead after change", (await j("/api/guest/login", { id: GID, password: "guest-pw-1" })).status === 401);
 check("new guest password works", (await j("/api/guest/login", { id: GID, password: "guest-pw-9" })).status === 200);
@@ -374,8 +391,11 @@ check("expired guest cannot log in", gmLoginExpired.status === 403 && gmLoginExp
 await j("/api/admin/guest", { id: GMID, action: "extend", days: 2 }, { cookie });
 check("guest link alive again after extend", (await fetch(gmMe.link)).status === 200);
 // guest manual expiry edit （修改时间， precise to the second)
+const gSetPastDay = await j("/api/admin/guest", { id: GMID, action: "set_expiry", expires_at: nowS - 90000 }, { cookie });
+check("guest set_expiry to a past day kills link", gSetPastDay.status === 200 && (await fetch(gmMe.link)).status === 403);
 const gSetPast = await j("/api/admin/guest", { id: GMID, action: "set_expiry", expires_at: nowS - 5 }, { cookie });
-check("guest set_expiry to past kills link", gSetPast.status === 200 && (await fetch(gmMe.link)).status === 403);
+check("guest set_expiry to moments ago serves poison (expiry-day stage)",
+  gSetPast.status === 200 && (await fetch(gmMe.link)).status === 200);
 const gSetFuture = await j("/api/admin/guest", { id: GMID, action: "set_expiry", expires_at: nowS + 3600 }, { cookie });
 check("guest set_expiry to future revives link", gSetFuture.status === 200 && gSetFuture.data.expires_at === nowS + 3600 && (await fetch(gmMe.link)).status === 200);
 const gSetBad = await j("/api/admin/guest", { id: GMID, action: "set_expiry", expires_at: "xyz" }, { cookie });
