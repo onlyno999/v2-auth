@@ -8,9 +8,12 @@ import { verifyAttestation } from "../lib/attest.js";
 export async function finishActivation(env, lic, body) {
   const machineCode = body.machineCode;
 
-  // Optional/required attestation of the genuine app build.
+  // Attestation of the genuine app build is REQUIRED by default
+  // (owner's rule: one mismatch, no issuance — and no dashboard
+  // variable to remember). ATTEST_REQUIRED=0 in the dashboard is
+  // the only opt-out, back to verify-when-present.
   let integrity = null;
-  if (body.attestation || env.ATTEST_REQUIRED === "1") {
+  if (body.attestation || env.ATTEST_REQUIRED !== "0") {
     if (!body.attestation) return json({ ok: false, reason: "attest_missing" }, 403);
     const chal = await env.V2.get("chal:" + machineCode);
     if (!chal) return json({ ok: false, reason: "attest_no_challenge" }, 403);
