@@ -38,5 +38,9 @@ const issue2 = await j("/api/admin/issue", { machineCode: M2, days: 30, mode: "c
 const bogus = await j("/api/activate", { machineCode: M2, code: issue2.data.code, pubkey: "x", platform: "android", attestation: ["AAAA"] });
 check("garbage chain still refused (verify-when-present)", bogus.status === 403 && bogus.data.reason !== "attest_missing", JSON.stringify(bogus.data));
 
+const devs = await j("/api/admin/devices", null, { cookie });
+const row = (devs.data.issued || []).find((i) => i.machine === M2);
+check("console data carries the attestation refusal reason", !!row && !!row.attest_fail && row.attest_fail.reason === bogus.data.reason, JSON.stringify(row && row.attest_fail));
+
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);
 process.exit(fail ? 1 : 0);

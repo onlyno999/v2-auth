@@ -18,9 +18,17 @@ export async function finishActivation(env, lic, body) {
   // is fully on 2.0+.
   let integrity = null;
   if (body.attestation || env.ATTEST_REQUIRED === "1") {
-    if (!body.attestation) return json({ ok: false, reason: "attest_missing" }, 403);
+    // Every attestation refusal is recorded where the seller can see
+    // it (admin console) — the app only shows a generic text.
+    const refuse = async (reason) => {
+      await logEvent(env, "attest_fail", machineCode, reason);
+      await env.V2.put("attestfail:" + machineCode,
+        JSON.stringify({ reason, at: nowSec() }), { expirationTtl: 7 * 86400 });
+      return json({ ok: false, reason }, 403);
+    };
+    if (!body.attestation) return refuse("attest_missing");
     const chal = await env.V2.get("chal:" + machineCode);
-    if (!chal) return json({ ok: false, reason: "attest_no_challenge" }, 403);
+    if (!chal) return refuse("attest_no_challenge");
     const verdict = await verifyAttestation(body.attestation.map((c) => b64Decode(c)), {
       challenge: b64Decode(chal),
       packageName: env.EXPECTED_PACKAGE || "com.v2ray.ang.fdroid",
@@ -31,10 +39,7 @@ export async function finishActivation(env, lic, body) {
       certSha256Hex: env.EXPECTED_CERT_SHA256 || "221f4dd0cfef8b76785ffc82ada95b23961553927aadbcc920395fdbd119758a",
       rootPinHex: env.ATTEST_ROOT_SHA256 || null,
     });
-    if (!verdict.ok) {
-      await logEvent(env, "attest_fail", machineCode, verdict.reason);
-      return json({ ok: false, reason: verdict.reason }, 403);
-    }
+    if (!verdict.ok) return refuse(verdict.reason);
     integrity = { boot: verdict.boot, root: verdict.rootHex, level: verdict.securityLevel };
     await env.V2.delete("chal:" + machineCode);
   }

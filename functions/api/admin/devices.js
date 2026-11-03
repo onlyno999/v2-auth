@@ -32,6 +32,9 @@ export async function onRequestGet({ request, env }) {
     getMany(env, devKeys.map((k) => "last:" + k.slice(4))),
   ]);
   const licByKey = new Map(licKeys.map((k) => [k, JSON.parse(licVals.get(k) || "{}")]));
+  const failKeys = await listKeys(env, "attestfail:");
+  const failVals = await getMany(env, failKeys);
+  const failByMachine = new Map(failKeys.map((k) => [k.slice(11), JSON.parse(failVals.get(k) || "null")]));
 
   const out = devKeys.map((k) => {
     const machine = k.slice(4);
@@ -70,6 +73,7 @@ export async function onRequestGet({ request, env }) {
         channel: lic.channel || "main", dist: lic.dist || null,
         status: lic.status, created_at: lic.created_at,
         code_enc: lic.code_enc || null,
+        attest_fail: failByMachine.get(lic.machine) || null,
       });
     }
   }
