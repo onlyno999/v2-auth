@@ -4,7 +4,7 @@ import { json, distSlugFromRequest, getLicByKey, cachedPayload } from "../../lib
 export async function onRequestGet({ request, env }) {
   const slug = await distSlugFromRequest(env, request);
   if (!slug) return json({ ok: false, reason: "unauthorized" }, 401);
-  const out = await cachedPayload("dist:devices:" + slug, 20000, () => buildDevices(env, slug));
+  const out = await cachedPayload(env, "dist:devices:" + slug, 20000, () => buildDevices(env, slug));
   return json({ ok: true, devices: out });
 }
 

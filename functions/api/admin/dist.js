@@ -6,7 +6,7 @@ import {
 // GET -> all distributors. POST -> create / update / disable / enable.
 export async function onRequestGet({ request, env }) {
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
-  const out = await cachedPayload("admin:dist", 20000, async () => {
+  const out = await cachedPayload(env, "admin:dist", 20000, async () => {
     const rows = [];
     const page = await env.V2.list({ prefix: "dist:", limit: 200 });
     for (const k of page.keys) {
@@ -24,7 +24,7 @@ export async function onRequestGet({ request, env }) {
 }
 
 export async function onRequestPost({ request, env }) {
-  bumpDataVersion(); // any console mutation invalidates cached table payloads
+  await bumpDataVersion(env); // any console mutation invalidates cached table payloads
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);
   const slug = (body.slug || "").toLowerCase();

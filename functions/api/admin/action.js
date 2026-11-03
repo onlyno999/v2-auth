@@ -8,7 +8,7 @@ import {
 // expiry (epoch seconds), or null for permanent.
 // Or {licKey, action: revoke} to kill an issued-but-unused code.
 export async function onRequestPost({ request, env }) {
-  bumpDataVersion(); // any console mutation invalidates cached table payloads
+  await bumpDataVersion(env); // any console mutation invalidates cached table payloads
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);
 

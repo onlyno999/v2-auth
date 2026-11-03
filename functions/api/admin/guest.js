@@ -11,7 +11,7 @@ import {
 // guest can only be deleted while disabled.
 export async function onRequestGet({ request, env }) {
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
-  const out = await cachedPayload("admin:guests", 20000, async () => {
+  const out = await cachedPayload(env, "admin:guests", 20000, async () => {
     const rows = [];
     const page = await env.V2.list({ prefix: "gst:", limit: 200 });
     for (const k of page.keys) {
@@ -46,7 +46,7 @@ async function findByUsername(env, username) {
 }
 
 export async function onRequestPost({ request, env }) {
-  bumpDataVersion(); // any console mutation invalidates cached table payloads
+  await bumpDataVersion(env); // any console mutation invalidates cached table payloads
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);
 

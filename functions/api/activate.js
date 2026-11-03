@@ -1,6 +1,7 @@
 import {
   json, readJson, nowSec, sha256hex,
   getLicByCode, getDev, putLic, putDev, licProblem, logEvent, newToken, durationSeconds,
+  bumpDataVersion,
 } from "../lib/core.js";
 
 // Shared activation tail: license is valid -> create device + token.
@@ -27,6 +28,7 @@ export async function finishActivation(env, lic, body) {
     await logEvent(env, "activate_fail", machineCode, "signer_mismatch");
     await env.V2.put("attestfail:" + machineCode,
       JSON.stringify({ reason: "signer_mismatch", at: nowSec() }), { expirationTtl: 7 * 86400 });
+    await bumpDataVersion(env);
     return json({ ok: false, reason: "signer_mismatch" }, 403);
   }
 

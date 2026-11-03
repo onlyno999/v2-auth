@@ -7,7 +7,7 @@ import {
 // Issues a license stamped dist=<slug>, channel="dist".
 // Rules: days must be 1..365 (no permanent, max 1 year), quota enforced.
 export async function onRequestPost({ request, env }) {
-  bumpDataVersion(); // license write below bypasses putLic; invalidate cached tables
+  await bumpDataVersion(env); // license write below bypasses putLic; invalidate cached tables
   const slug = await distSlugFromRequest(env, request);
   if (!slug) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);

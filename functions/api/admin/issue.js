@@ -10,7 +10,7 @@ import {
 // (0 = permanent). mode "code": returns a license code pre-bound to
 // the machine. mode "open": direct-open — the user claims it.
 export async function onRequestPost({ request, env }) {
-  bumpDataVersion(); // license writes below bypass putLic; invalidate cached tables
+  await bumpDataVersion(env); // license writes below bypass putLic; invalidate cached tables
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);
   // The machine field must hold a machine code — never an activation

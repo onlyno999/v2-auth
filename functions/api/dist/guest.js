@@ -47,7 +47,7 @@ export async function onRequestGet({ request, env }) {
 }
 
 export async function onRequestPost({ request, env }) {
-  bumpDataVersion(); // any console mutation invalidates cached table payloads
+  await bumpDataVersion(env); // any console mutation invalidates cached table payloads
   const slug = await distSlugFromRequest(env, request);
   if (!slug) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);

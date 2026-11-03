@@ -14,22 +14,38 @@ export const json = (obj, status = 200, extraHeaders = {}) =>
 
 export const nowSec = () => Math.floor(Date.now() / 1000);
 
-// ---------- list-quota guard ----------
-// KV list() carries a low daily quota (free plan: 1,000/day) and
-// the console table builders scan whole prefixes — a bad evening of
-// refreshes burned the whole day's quota and every list-backed
-// table died with "KV list() limit exceeded for the day". Built
-// payloads are cached in the isolate for a few seconds; every
-// record mutation funnels through the put* helpers below, which
-// bump the data version and invalidate the cache immediately.
-let _dataVersion = 0;
-export const bumpDataVersion = () => { _dataVersion++; };
+// ---------- table-payload cache ----------
+// The console table builders scan whole key prefixes; on KV that
+// burned the 1,000/day list() quota in one evening. Built payloads
+// are cached per isolate for a few seconds. The cache version is
+// a row in the store itself ("meta:dataver"), NOT isolate memory:
+// production runs many isolates, and an in-memory version once
+// made a console edit look like it "didn't take" — the write had
+// landed, but another isolate kept serving its stale table for up
+// to the TTL. Every record mutation funnels through the put*
+// helpers (or an explicit bump at the handler), each bump rewrites
+// the version row, and a cache hit requires a version match — so
+// an edit is visible on the very next load, on any isolate. The
+// version check costs one row read per table load.
 const _payloadCache = new Map();
-export async function cachedPayload(key, ttlMs, builder) {
+export async function bumpDataVersion(env) {
+  try {
+    await env.V2.put("meta:dataver", `${Date.now()}:${Math.random().toString(36).slice(2)}`);
+  } catch {
+    // A failed bump only means tables may serve the TTL-stale copy.
+  }
+}
+export async function cachedPayload(env, key, ttlMs, builder) {
+  let ver = null;
+  try {
+    ver = await env.V2.get("meta:dataver");
+  } catch {
+    // Version unreadable: fall through and rebuild.
+  }
   const hit = _payloadCache.get(key);
-  if (hit && hit.v === _dataVersion && Date.now() - hit.at < ttlMs) return hit.val;
+  if (hit && hit.v === ver && Date.now() - hit.at < ttlMs) return hit.val;
   const val = await builder();
-  _payloadCache.set(key, { v: _dataVersion, at: Date.now(), val });
+  _payloadCache.set(key, { v: ver, at: Date.now(), val });
   return val;
 }
 
@@ -126,7 +142,7 @@ export async function getLicByCode(env, code) {
   return raw ? { key: await codeKey(code), ...JSON.parse(raw) } : null;
 }
 export async function putLic(env, lic) {
-  bumpDataVersion();
+  await bumpDataVersion(env);
   await env.V2.put(lic.key, JSON.stringify(lic.rec ?? lic));
 }
 export async function getLicByKey(env, key) {
@@ -138,7 +154,7 @@ export async function getDev(env, machineCode) {
   return raw ? JSON.parse(raw) : null;
 }
 export async function putDev(env, machineCode, dev) {
-  bumpDataVersion();
+  await bumpDataVersion(env);
   await env.V2.put("dev:" + machineCode, JSON.stringify(dev));
 }
 export async function logEvent(env, kind, machineCode = "", detail = "") {
@@ -329,7 +345,7 @@ export async function getDist(env, slug) {
   return raw ? JSON.parse(raw) : null;
 }
 export async function putDist(env, slug, rec) {
-  bumpDataVersion();
+  await bumpDataVersion(env);
   await env.V2.put("dist:" + slug, JSON.stringify(rec));
 }
 export const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,23}$/;
@@ -383,7 +399,7 @@ export async function getGuest(env, id) {
   return raw ? JSON.parse(raw) : null;
 }
 export async function putGuest(env, id, rec) {
-  bumpDataVersion();
+  await bumpDataVersion(env);
   await env.V2.put("gst:" + id, JSON.stringify(rec));
 }
 export function newGuestId() {

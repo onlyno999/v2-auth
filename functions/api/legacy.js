@@ -121,7 +121,7 @@ export async function onRequestPost({ request, env }) {
       expires_at: expiresAt,
     };
     await env.V2.put(key, JSON.stringify(lic));
-    bumpDataVersion();
+    await bumpDataVersion(env);
   }
   await logEvent(env, "legacy_convert", body.machineCode);
   return finishActivation(env, lic, body);

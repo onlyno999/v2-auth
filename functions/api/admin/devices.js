@@ -27,7 +27,7 @@ export async function onRequestGet({ request, env }) {
     // quota, so serve the isolate-cached build (invalidated by any
     // mutation via the data version) instead of re-listing on every
     // console load and auto-login check.
-    const payload = await cachedPayload("admin:devices", 20000, () => buildDevices(env));
+    const payload = await cachedPayload(env, "admin:devices", 20000, () => buildDevices(env));
     return json(payload);
   } catch (e) {
     // Surface the real error to the (admin-only) console instead of
