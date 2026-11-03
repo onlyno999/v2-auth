@@ -8,7 +8,12 @@ export async function onRequestGet({ request, env }) {
   const out = [];
   const page = await env.V2.list({ prefix: "dist:", limit: 200 });
   for (const k of page.keys) {
-    const rec = JSON.parse((await env.V2.get(k.name)) || "{}");
+    const raw = await env.V2.get(k.name);
+    // KV is eventually consistent: a just-written key can list before
+    // its value is readable. Never render a ghost row from "{}" —
+    // skip it; it appears whole on the next refresh.
+    if (!raw) continue;
+    const rec = JSON.parse(raw);
     out.push({ slug: k.name.slice(5), ...rec, pw_hash: undefined, has_pw: !!rec.pw_hash });
   }
   return json({ ok: true, distributors: out });
@@ -40,7 +45,13 @@ export async function onRequestPost({ request, env }) {
     return json({ ok: true, slug });
   }
 
-  const rec = await getDist(env, slug);
+  // A just-created record may not be readable everywhere yet (KV
+  // eventual consistency): retry the read before saying not_found.
+  let rec = await getDist(env, slug);
+  for (let i = 0; !rec && i < 3; i++) {
+    await new Promise((r) => setTimeout(r, 700));
+    rec = await getDist(env, slug);
+  }
   if (!rec) return json({ ok: false, reason: "not_found" }, 404);
   switch (body.action) {
     case "disable":
