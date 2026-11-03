@@ -51,32 +51,32 @@ export function newToken() {
 
 // ---------- KV record access ----------
 export async function getLicByCode(env, code) {
-  const raw = await env.KV.get(await codeKey(code));
+  const raw = await env.V2.get(await codeKey(code));
   return raw ? { key: await codeKey(code), ...JSON.parse(raw) } : null;
 }
 export async function putLic(env, lic) {
-  await env.KV.put(lic.key, JSON.stringify(lic.rec ?? lic));
+  await env.V2.put(lic.key, JSON.stringify(lic.rec ?? lic));
 }
 export async function getLicByKey(env, key) {
-  const raw = await env.KV.get(key);
+  const raw = await env.V2.get(key);
   return raw ? { key, ...JSON.parse(raw) } : null;
 }
 export async function getDev(env, machineCode) {
-  const raw = await env.KV.get("dev:" + machineCode);
+  const raw = await env.V2.get("dev:" + machineCode);
   return raw ? JSON.parse(raw) : null;
 }
 export async function putDev(env, machineCode, dev) {
-  await env.KV.put("dev:" + machineCode, JSON.stringify(dev));
+  await env.V2.put("dev:" + machineCode, JSON.stringify(dev));
 }
 export async function logEvent(env, kind, machineCode = "", detail = "") {
   // Best-effort, low volume: one small key per day-bucket counter plus a
   // rolling "last events" list is overkill for v1; keep a per-day counter.
   const day = new Date().toISOString().slice(0, 10);
   const k = `stat:${day}:${kind}`;
-  const cur = parseInt((await env.KV.get(k)) || "0", 10);
-  await env.KV.put(k, String(cur + 1), { expirationTtl: 60 * 60 * 24 * 40 });
+  const cur = parseInt((await env.V2.get(k)) || "0", 10);
+  await env.V2.put(k, String(cur + 1), { expirationTtl: 60 * 60 * 24 * 40 });
   if (machineCode) {
-    await env.KV.put(`last:${machineCode}`, JSON.stringify({ kind, detail, ts: nowSec() }), {
+    await env.V2.put(`last:${machineCode}`, JSON.stringify({ kind, detail, ts: nowSec() }), {
       expirationTtl: 60 * 60 * 24 * 30,
     });
   }

@@ -27,7 +27,7 @@ npm test                         # 全流程 24 项断言（需先 dev 起来）
 ## 上线（Cloudflare）
 1. 在 Cloudflare 建 KV 命名空间，把 id 填进 `wrangler.toml`。
 2. Pages 项目连接本仓库（构建输出目录 = `public`，无需构建命令）。
-3. Pages 项目设置里绑定：KV 绑定名 `KV`；密钥变量：
+3. Pages 项目设置里绑定：KV 绑定名 `V2`；密钥变量：
    `ADMIN_PASSWORD`（后台登录密码）、`SESSION_SECRET`（随机长串）、
    `ADMIN_SECRET`（可选，脚本调管理接口用）、`SUB_URL`（订阅真实地址）、
    `EXPECTED_PACKAGE`、`EXPECTED_CERT_SHA256`（官方签名证书 SHA-256）、

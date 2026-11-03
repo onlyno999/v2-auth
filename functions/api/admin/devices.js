@@ -6,13 +6,13 @@ export async function onRequestGet({ request, env }) {
   const out = [];
   let cursor;
   do {
-    const page = await env.KV.list({ prefix: "dev:", limit: 200, cursor });
+    const page = await env.V2.list({ prefix: "dev:", limit: 200, cursor });
     cursor = page.list_complete ? undefined : page.cursor;
     for (const k of page.keys) {
-      const dev = JSON.parse((await env.KV.get(k.name)) || "{}");
+      const dev = JSON.parse((await env.V2.get(k.name)) || "{}");
       const machine = k.name.slice(4);
       const lic = dev.lic ? await getLicByKey(env, dev.lic) : null;
-      const last = await env.KV.get("last:" + machine);
+      const last = await env.V2.get("last:" + machine);
       out.push({
         machine,
         platform: dev.platform || "",
@@ -33,7 +33,7 @@ export async function onRequestGet({ request, env }) {
   } while (cursor);
   // Pending direct-opens (not yet claimed)
   const opens = [];
-  const op = await env.KV.list({ prefix: "open:", limit: 200 });
+  const op = await env.V2.list({ prefix: "open:", limit: 200 });
   for (const k of op.keys) opens.push(k.name.slice(5));
   return json({ ok: true, devices: out, pending_open: opens });
 }

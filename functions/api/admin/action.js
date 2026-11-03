@@ -9,7 +9,7 @@ export async function onRequestPost({ request, env }) {
   const machine = body.machineCode;
   if (!machine) return json({ ok: false, reason: "no_machine" }, 400);
   const dev = await getDev(env, machine);
-  const licKey = dev?.lic || (await env.KV.get("open:" + machine));
+  const licKey = dev?.lic || (await env.V2.get("open:" + machine));
   const lic = licKey ? await getLicByKey(env, licKey) : null;
 
   switch (body.action) {
@@ -26,8 +26,8 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: true });
     }
     case "unbind": {
-      await env.KV.delete("dev:" + machine);
-      await env.KV.delete("open:" + machine);
+      await env.V2.delete("dev:" + machine);
+      await env.V2.delete("open:" + machine);
       if (lic && lic.status !== "revoked") {
         await putLic(env, { ...lic, status: "issued", activated_at: lic.activated_at });
       }

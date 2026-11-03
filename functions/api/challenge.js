@@ -7,6 +7,6 @@ export async function onRequestPost({ request, env }) {
   const rnd = new Uint8Array(32);
   crypto.getRandomValues(rnd);
   const challenge = b64urlEncode(rnd);
-  await env.KV.put("chal:" + body.machineCode, challenge, { expirationTtl: 300 });
+  await env.V2.put("chal:" + body.machineCode, challenge, { expirationTtl: 300 });
   return json({ ok: true, challenge });
 }

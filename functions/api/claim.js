@@ -7,12 +7,12 @@ import { finishActivation } from "./activate.js";
 export async function onRequestPost({ request, env }) {
   const body = await readJson(request);
   if (!body.machineCode) return json({ ok: false, reason: "bad_request" }, 400);
-  const licKey = await env.KV.get("open:" + body.machineCode);
+  const licKey = await env.V2.get("open:" + body.machineCode);
   if (!licKey) return json({ ok: false, reason: "no_open" }, 404);
   const lic = await getLicByKey(env, licKey);
   if (!lic || lic.status !== "open") return json({ ok: false, reason: "no_open" }, 404);
   const res = await finishActivation(env, lic, body);
-  if (res.status === 200) await env.KV.delete("open:" + body.machineCode);
+  if (res.status === 200) await env.V2.delete("open:" + body.machineCode);
   await logEvent(env, "claim", body.machineCode);
   return res;
 }

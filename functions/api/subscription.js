@@ -17,8 +17,8 @@ export async function onRequestPost({ request, env }) {
     });
   }
 
-  let content = await env.KV.get("sub:content");
-  const fetchedAt = parseInt((await env.KV.get("sub:fetched_at")) || "0", 10);
+  let content = await env.V2.get("sub:content");
+  const fetchedAt = parseInt((await env.V2.get("sub:fetched_at")) || "0", 10);
   if (!content || nowSec() - fetchedAt > FRESH_SEC) {
     try {
       const up = await fetch(env.SUB_URL, { headers: { "user-agent": "okhttp/4.9.0" } });
@@ -26,8 +26,8 @@ export async function onRequestPost({ request, env }) {
         const text = await up.text();
         if (text && text.length > 50) {
           content = text;
-          await env.KV.put("sub:content", text);
-          await env.KV.put("sub:fetched_at", String(nowSec()));
+          await env.V2.put("sub:content", text);
+          await env.V2.put("sub:fetched_at", String(nowSec()));
           await logEvent(env, "sub_refresh", body.machineCode);
         }
       }

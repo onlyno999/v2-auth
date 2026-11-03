@@ -22,9 +22,9 @@ export async function onRequestPost({ request, env }) {
     activated_at: null,
     expires_at: null,
   };
-  await env.KV.put(key, JSON.stringify(rec));
+  await env.V2.put(key, JSON.stringify(rec));
   if (mode === "open") {
-    await env.KV.put("open:" + body.machineCode, key);
+    await env.V2.put("open:" + body.machineCode, key);
     await logEvent(env, "admin_open", body.machineCode, `${days}d`);
     return json({ ok: true, mode });
   }
