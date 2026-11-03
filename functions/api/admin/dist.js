@@ -60,6 +60,13 @@ export async function onRequestPost({ request, env }) {
     case "enable":
       await putDist(env, slug, { ...rec, status: "active" });
       return json({ ok: true });
+    case "rename":
+      {
+        const name = String(body.name || "").trim().slice(0, 40);
+        if (!name) return json({ ok: false, reason: "no_name" }, 400);
+        await putDist(env, slug, { ...rec, name });
+      }
+      return json({ ok: true });
     case "quota":
       await putDist(env, slug, { ...rec, quota: Math.floor(body.quota ?? rec.quota) });
       return json({ ok: true });

@@ -177,6 +177,9 @@ check("portal /mmm serves distributor console", portal.status === 200 && portalH
 check("unknown slug 404s", (await fetch(BASE + "/nosuchslug")).status === 404);
 const distBadLogin = await j("/api/dist/login", { slug: "mmm", password: "nope" });
 check("dist bad password rejected", distBadLogin.status === 401);
+const renameDist = await j("/api/admin/dist", { slug: "mmm", action: "rename", name: "老王本王" }, { cookie });
+const distList2 = await (await fetch(BASE + "/api/admin/dist", { headers: { cookie } })).json();
+check("distributor renamed", renameDist.status === 200 && (distList2.distributors || []).some((d) => d.slug === "mmm" && d.name === "老王本王"));
 const distLoginRes = await fetch(BASE + "/api/dist/login", {
   method: "POST", headers: { "content-type": "application/json" },
   body: JSON.stringify({ slug: "mmm", password: "dist-pw-1" }),
@@ -231,10 +234,10 @@ const state3 = await fetch(BASE + "/api/dist/state?slug=abc");
 check("disabled account deleted, slug gone", delOk.status === 200 && state3.status === 404);
 
 // device hard delete: row + license gone, token useless afterwards
-const delDev = await j("/api/admin/action", { machineCode: M, action: "delete" }, { cookie });
-const afterDel = await j("/api/admin/devices", null, { cookie, method: "GET" });
-check("device deleted from table", delDev.status === 200 && !afterDel.data.devices.some((d) => d.machine === M));
-const valAfterDel = await j("/api/validate", {}, { auth: "Bearer " + token });
+const delDev = await j("/api/admin/action", { machineCode: M1, action: "delete" }, { cookie });
+const afterDel = await (await fetch(BASE + "/api/admin/devices", { headers: { cookie } })).json();
+check("device deleted from table", delDev.status === 200 && !(afterDel.devices || []).some((d) => d.machine === M1));
+const valAfterDel = await j("/api/validate", { machineCode: M1, token: act1.data.token });
 check("validate denied after device delete", valAfterDel.status === 403);
 
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);

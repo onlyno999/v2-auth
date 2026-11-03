@@ -270,6 +270,7 @@ async function loadDists() {
       : `<button class="small ghost" onclick="distAct('${d.slug}','enable')">恢复</button>
          <button class="small danger" onclick="distAct('${d.slug}','delete')">删除账户</button>`}
       <button class="small ghost" onclick="distAct('${d.slug}','resetpw')">重置密码</button>
+      <button class="small ghost" onclick="distAct('${d.slug}','rename')">改名</button>
       <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button></td></tr>`).join("");
 }
 async function distAct(slug, action) {
@@ -280,6 +281,11 @@ async function distAct(slug, action) {
     const q = prompt(`分销商 ${slug} 的总额度（个数，-1 = 不限）：`);
     if (q === null || q === "") return;
     body.quota = Number(q);
+  }
+  if (action === "rename") {
+    const n = prompt(`分销商 ${slug} 的新名称：`);
+    if (n === null || !n.trim()) return;
+    body.name = n.trim();
   }
   const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify(body) });
   if (!data.ok) alert("失败：" + (data.reason || ""));
