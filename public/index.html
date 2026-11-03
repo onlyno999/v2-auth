@@ -233,10 +233,23 @@ async function loadDists() {
     <td>${d.status === "active" ? "正常" : "已停用"}</td>
     <td>${d.status === "active"
       ? `<button class="small danger" onclick="distAct('${d.slug}','disable')">停用</button>`
-      : `<button class="small ghost" onclick="distAct('${d.slug}','enable')">恢复</button>`}</td></tr>`).join("");
+      : `<button class="small ghost" onclick="distAct('${d.slug}','enable')">恢复</button>`}
+      <button class="small ghost" onclick="distAct('${d.slug}','password')">改密码</button>
+      <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button></td></tr>`).join("");
 }
 async function distAct(slug, action) {
-  const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify({ slug, action }) });
+  const body = { slug, action };
+  if (action === "password") {
+    const pw = prompt(`给分销商 ${slug} 设置新密码（至少 6 位）：`);
+    if (!pw) return;
+    body.password = pw;
+  }
+  if (action === "quota") {
+    const q = prompt(`分销商 ${slug} 的总额度（个数，-1 = 不限）：`);
+    if (q === null || q === "") return;
+    body.quota = Number(q);
+  }
+  const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify(body) });
   if (!data.ok) alert("失败：" + (data.reason || ""));
   loadDists();
 }
