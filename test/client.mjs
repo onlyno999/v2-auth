@@ -115,7 +115,7 @@ check("issued code re-copyable via vault", issuedM2.code === issue2.data.code, i
 const killCode = await j("/api/admin/action", { licKey: issuedM2.licKey, action: "revoke" }, { cookie });
 const dev2x = await newDeviceKey();
 const deadActivate = await j("/api/activate", { machineCode: M2, code: issue2.data.code, pubkey: dev2x.pubkey });
-check("revoked unused code cannot activate", killCode.status === 200 && deadActivate.status === 403 && deadActivate.data.reason === "revoked");
+check("killed unused code is hard-deleted and cannot activate", killCode.status === 200 && deadActivate.status === 403 && deadActivate.data.reason === "not_found");
 const act1 = await j("/api/activate", { machineCode: M1, code: issue1.data.code, pubkey: dev1.pubkey, platform: "android-test" });
 check("activate ok + token", act1.status === 200 && !!act1.data.token && !!act1.data.expires_at);
 

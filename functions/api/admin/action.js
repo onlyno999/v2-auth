@@ -14,8 +14,14 @@ export async function onRequestPost({ request, env }) {
     const lic = await getLicByKey(env, body.licKey);
     if (!lic) return json({ ok: false, reason: "not_found" }, 404);
     if (body.action === "revoke") {
-      await putLic(env, { ...lic, status: "revoked" });
-      if (lic.machine) await env.V2.delete("open:" + lic.machine);
+      // 作废 an unused code is a hard delete (owner's rule: what the
+      // console deletes must disappear from KV too — no tombstones).
+      // The license record, its open claim and any refusal note go.
+      await env.V2.delete(body.licKey);
+      if (lic.machine) {
+        await env.V2.delete("open:" + lic.machine);
+        await env.V2.delete("attestfail:" + lic.machine);
+      }
       await logEvent(env, "admin_revoke_code", lic.machine || "");
       return json({ ok: true });
     }
@@ -44,6 +50,8 @@ export async function onRequestPost({ request, env }) {
     case "unbind": {
       await env.V2.delete("dev:" + machine);
       await env.V2.delete("open:" + machine);
+      await env.V2.delete("last:" + machine);
+      await env.V2.delete("attestfail:" + machine);
       if (lic && lic.status !== "revoked") {
         await putLic(env, { ...lic, status: "issued", activated_at: lic.activated_at });
       }
@@ -51,11 +59,16 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: true });
     }
     case "delete": {
-      // Hard delete: the device row, its license and any open claim
-      // all go. The machine is treated as never-activated afterwards
-      // (it would need a fresh code). Unlike revoke, nothing remains.
+      // Hard delete: the device row, its license and every per-
+      // machine trace all go (owner's rule: console deletions must
+      // clean KV too). The machine is treated as never-activated
+      // afterwards (it would need a fresh code). Unlike revoke
+      // (停用, restorable), nothing remains.
       await env.V2.delete("dev:" + machine);
       await env.V2.delete("open:" + machine);
+      await env.V2.delete("last:" + machine);
+      await env.V2.delete("attestfail:" + machine);
+      await env.V2.delete("chal:" + machine);
       if (licKey) await env.V2.delete(licKey);
       await logEvent(env, "admin_delete_device", machine);
       return json({ ok: true });
