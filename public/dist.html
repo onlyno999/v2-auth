@@ -139,6 +139,7 @@ const api = async (path, opts = {}) => {
   for (let i = 0; i < tries; i++) {
     try {
       const r = await fetch(path, {
+        cache: "no-store",
         headers: { "content-type": "application/json", ...(sess ? { "x-dsess": sess } : {}) },
         ...opts,
       });

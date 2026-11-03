@@ -172,6 +172,7 @@ const api = async (path, opts = {}) => {
   for (let i = 0; i < tries; i++) {
     try {
       const r = await fetch(path, {
+        cache: "no-store",
         headers: { "content-type": "application/json", ...(sess ? { "x-session": sess } : {}) },
         ...opts,
       });
@@ -317,8 +318,13 @@ async function copyIssued(code) {
 window.copyIssued = copyIssued;
 
 async function loadDevices() {
-  const { data } = await api("/api/admin/devices");
-  if (!data.ok) { $("tbody").innerHTML = '<tr><td colspan="8">未登录或加载失败</td></tr>'; return; }
+  const { status, data } = await api("/api/admin/devices");
+  if (!data.ok) {
+    const why = `HTTP ${status}${data.reason ? "：" + data.reason : ""}${data.detail ? "：" + data.detail : ""}`;
+    $("tbody").innerHTML = `<tr><td colspan="8">未登录或加载失败（${why}）</td></tr>`;
+    $("issuedBody").innerHTML = `<tr><td colspan="6" class="muted">加载失败（${why}）</td></tr>`;
+    return;
+  }
   const pb = $("pendingBox");
   if (data.pending_open && data.pending_open.length) {
     pb.classList.remove("hidden");

@@ -20,7 +20,18 @@ async function getMany(env, keys) {
 // GET -> device table for the admin console. All KV reads are parallel:
 // on a slow client connection the response must complete fast, or the
 // phone gives up and shows 加载失败.
-export async function onRequestGet({ request, env }) {
+export async function onRequestGet(ctx) {
+  try {
+    return await buildDevices(ctx);
+  } catch (e) {
+    // Surface the real error to the (admin-only) console instead of
+    // dying as an opaque 500: the generic 加载失败 cell cost a long
+    // guessing session in the field.
+    return json({ ok: false, reason: "server_error", detail: String((e && e.message) || e) }, 500);
+  }
+}
+
+async function buildDevices({ request, env }) {
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
 
   const [devKeys, openKeys, licKeys] = await Promise.all([
