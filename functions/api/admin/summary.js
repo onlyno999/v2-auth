@@ -1,4 +1,4 @@
-import { json, readJson, isAdmin, tierForLevel } from "../../lib/core.js";
+import { json, readJson, isAdmin, tierForLevel, consoleUnitPrice } from "../../lib/core.js";
 import { buildTree } from "../../lib/tree.js";
 
 // The console's monthly bill (owner, 2026-11-04): a summary page
@@ -13,12 +13,7 @@ import { buildTree } from "../../lib/tree.js";
 // by seller level; he alone settles with the console. The base
 // price is one global setting (meta:unitprice), default 4.
 const PRICE_KEY = "meta:unitprice";
-
-async function unitPrice(env) {
-  const raw = await env.V2.get(PRICE_KEY);
-  const n = raw ? Number(raw) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : 4;
-}
+const unitPrice = consoleUnitPrice;
 
 export async function onRequestGet({ request, env }) {
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);

@@ -3,6 +3,7 @@ import {
   SLUG_RE, RESERVED_SLUGS, bumpDataVersion, moveDistributor, listDistChildren,
   distLevel, recordStock,
 } from "../../lib/core.js";
+import { buildTree } from "../../lib/tree.js";
 
 // The distributor tree (owner's design, 2026-11-04): five levels,
 // ternary — every distributor may open AT MOST 3 sub-distributors
@@ -43,8 +44,11 @@ export async function onRequestGet({ request, env }) {
   const me = await getDist(env, slug);
   if (!me) return json({ ok: false, reason: "unauthorized" }, 401);
   const kids = await listDistChildren(env, slug);
+  const myPrice = Number.isFinite(me.price) && me.price > 0 ? me.price : null;
   const out = [];
   for (const k of kids) {
+    const subTree = await buildTree(env, k.slug);
+    const subUnits = subTree ? subTree.stats.month.units : 0;
     out.push({
       slug: k.slug,
       name: k.rec.name || "",
@@ -55,6 +59,8 @@ export async function onRequestGet({ request, env }) {
       level: distLevel(k.rec),
       children: (await listDistChildren(env, k.slug)).length,
       users: await tallyUsers(env, k.slug),
+      month_units: subUnits,
+      owe_to_me: myPrice === null ? null : Math.round(subUnits * myPrice * 100) / 100,
     });
   }
   return json({

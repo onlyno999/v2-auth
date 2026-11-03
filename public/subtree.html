@@ -121,7 +121,7 @@ async function load() {
   }
   if (window.onData) onData(data);
   $("title").textContent = `${data.dist.name || data.dist.slug}（${data.dist.slug} · 第${data.dist.level}级）名下`;
-  $("summary").textContent = `整个下面共 ${data.totals.devices + data.totals.guests} 个用户：客户 ${data.totals.devices} 台 · 游客 ${data.totals.guests} 个 · 下级分销商 ${data.totals.subs} 个（这一页列的是直属：客户 ${data.devices.length} 台 · 待激活 ${data.pending} · 游客 ${data.guests.length} 个 · 下级 ${data.subs.length} 个）`;
+  $("summary").textContent = `整个下面共 ${data.totals.devices + data.totals.guests} 个用户：客户 ${data.totals.devices} 台 · 游客 ${data.totals.guests} 个 · 下级分销商 ${data.totals.subs} 个（这一页列的是直属：客户 ${data.devices.length} 台 · 待激活 ${data.pending} · 游客 ${data.guests.length} 个 · 下级 ${data.subs.length} 个）` + (data.owe_parent === null || data.owe_parent === undefined ? " 本月应付上级：上级未定价，暂算不出。" : ` 本月应付上级（${data.dist.parent ? data.dist.parent : "总控制台"}）：¥${data.owe_parent}。`)
   $("devBody").innerHTML = data.devices.length ? data.devices.map((d) => `<tr>
     <td class="mono" data-label="机器码">${d.machine}<div class="muted">${d.note || ""}</div></td>
     <td data-label="激活">${fmt(d.activated_at)}</td>
@@ -155,7 +155,7 @@ async function load() {
     <div class="muted" style="margin-top:4px">金额按 ${data.stats.ref_price} 元/月参考价折算（年卡按 12 个月计）；他实际卖多少钱是他自己的事，这里只做统计。</div>`;
   $("subBody").innerHTML = data.subs.length ? data.subs.map((x) => `<tr>
     <td class="mono" data-label="分销商">${x.slug}<div class="muted">${x.name || ""} · 第${x.level}级</div></td>
-    <td data-label="名下">客户 ${x.devices} 台${x.pending ? "（待激活 " + x.pending + "）" : ""} · 游客 ${x.guests} 个 · 下级 ${x.children} 个</td>
+    <td data-label="名下">客户 ${x.devices} 台${x.pending ? "（待激活 " + x.pending + "）" : ""} · 游客 ${x.guests} 个 · 下级 ${x.children} 个<div>本月开了 ${x.month_units || 0} 个月 · 应交本页主人 <b>${x.owe_to_root === null || x.owe_to_root === undefined ? "未定价，算不出" : "¥" + x.owe_to_root}</b></div></td>
     <td data-label="状态">${x.status === "disabled" ? "已停用" : "正常"}</td>
     <td class="acts"><a href="${PAGE}?slug=${x.slug}&from=${SLUG}from=${data.dist.slug}"><button class="small ghost">进去看</button></a>
     ${ACT ? (x.status === "disabled"

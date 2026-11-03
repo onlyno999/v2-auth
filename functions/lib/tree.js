@@ -1,4 +1,4 @@
-import { getDist, listDistChildren, distLevel, cachedPayload, quotaCostFor, nowSec, beijingDay } from "./core.js";
+import { getDist, listDistChildren, distLevel, cachedPayload, quotaCostFor, nowSec, beijingDay, tierForLevel, consoleUnitPrice } from "./core.js";
 
 // Shared subtree builder for the two 名下 pages (admin tree.html
 // and distributor subtree.html): one distributor's direct people
@@ -102,9 +102,30 @@ export async function buildTree(env, slug) {
     for (const g of guests) tallyOpen(g.rec.dist, g.rec.created_at, g.rec.duration_sec, g.rec.days);
     const daily = [...byDay.values()].sort((a, b) => (a.day < b.day ? 1 : -1));
     const stats = { census, daily, month: statsMonth, total: statsTotal, ref_price: REF_PRICE };
+    // What this distributor owes HIS parent this month, and what
+    // each direct sub owes HIM — the same numbers his own bill
+    // page shows, synced onto every roster page (owner,
+    // 2026-11-04: '二级的、三级的，都应该相应的同步'). To the
+    // console the amount is the tiered sum over his subtree; to
+    // a distributor parent it is the parent's price times his
+    // subtree month units; unpriced parent -> null (unknowable).
+    let oweParent = null;
+    if (!root.parent) {
+      const base = await consoleUnitPrice(env);
+      oweParent = Math.round(Object.entries(statsMonth.by_level || {})
+        .reduce((a, [lv, u]) => a + u * tierForLevel(base, Number(lv)), 0) * 100) / 100;
+    } else {
+      const p = await getDist(env, root.parent);
+      if (p && Number.isFinite(p.price) && p.price > 0) {
+        oweParent = Math.round(statsMonth.units * p.price * 100) / 100;
+      }
+    }
+    const myPrice = Number.isFinite(root.price) && root.price > 0 ? root.price : null;
     const kids = await listDistChildren(env, slug);
     const subs = [];
     for (const k of kids) {
+      const subTree = await buildTree(env, k.slug);
+      const subUnits = subTree ? subTree.stats.month.units : 0;
       subs.push({
         slug: k.slug,
         name: k.rec.name || "",
@@ -114,6 +135,8 @@ export async function buildTree(env, slug) {
         devices: devicesOf(k.slug).length,
         pending: pendingOf(k.slug),
         guests: guestsOf(k.slug).length,
+        month_units: subUnits,
+        owe_to_root: myPrice === null ? null : Math.round(subUnits * myPrice * 100) / 100,
       });
     }
     return {
@@ -126,6 +149,7 @@ export async function buildTree(env, slug) {
         status: root.status || "active",
       },
       subs,
+      owe_parent: oweParent,
       devices: devicesOf(slug),
       guests: guestsOf(slug),
       pending: pendingOf(slug),

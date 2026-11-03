@@ -287,7 +287,7 @@ async function loadSubs() {
   }
   $("subBody").innerHTML = data.distributors.map((d) => `<tr>
     <td class="mono" data-label="登录地址">${location.origin}/${d.slug}</td>
-    <td data-label="额度">${d.used} / ${d.quota < 0 ? "不限" : d.quota}<div class="muted">客户 ${d.users.devices} 台${d.users.pending ? "（待激活 " + d.users.pending + "）" : ""} · 游客 ${d.users.guests} 个 · 下级 ${d.children}/${data.max_children}</div></td>
+    <td data-label="额度">${d.used} / ${d.quota < 0 ? "不限" : d.quota}<div class="muted">客户 ${d.users.devices} 台${d.users.pending ? "（待激活 " + d.users.pending + "）" : ""} · 游客 ${d.users.guests} 个 · 下级 ${d.children}/${data.max_children}</div><div>本月开了 ${d.month_units || 0} 个月 · 应交我 <b>${d.owe_to_me === null || d.owe_to_me === undefined ? "未定价，算不出" : "¥" + d.owe_to_me}</b></div></td>
     <td data-label="状态">${!d.has_pw ? "待他设密码" : (d.status === "active" ? "正常" : "已停用")}</td>
     <td class="acts"><a href="/subtree.html?slug=${d.slug}"><button class="small ghost" type="button">看名下</button></a>
     ${d.status === "active"

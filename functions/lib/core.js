@@ -427,6 +427,15 @@ export async function listDistChildren(env, slug) {
 // (365.25/12 days); any issue costs ceil(duration / month),
 // minimum 1. A 365-day card costs exactly 12.
 export const MONTH_SEC = 2629800;
+// The console's base (level-1) price per month unit: one global
+// setting the owner can change on the summary page
+// (meta:unitprice); the code default applies until he saves one.
+export async function consoleUnitPrice(env) {
+  const raw = await env.V2.get("meta:unitprice");
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : 4;
+}
+
 // Console's tiered take per month unit, by the SELLER's level
 // (owner, 2026-11-04): level 1 pays the base price (default 4),
 // each deeper level 1 yuan less, floored at 1 — "even at the
