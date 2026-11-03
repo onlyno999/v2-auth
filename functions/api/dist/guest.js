@@ -1,7 +1,7 @@
 import {
   json, readJson, nowSec, distSlugFromRequest, getDist, putDist, sha256hex,
   bumpDataVersion,
-  getGuest, putGuest, newGuestId, guestProblem, vaultSeal, SLUG_RE, guestFetchView, guestFetchReset,
+  getGuest, putGuest, newGuestId, guestProblem, vaultSeal, SLUG_RE, guestLimitInput, guestFetchView, guestFetchReset,
   parseDurationSec, durationSeconds, fmtDuration, logEvent,
 } from "../../lib/core.js";
 
@@ -59,6 +59,8 @@ export async function onRequestPost({ request, env }) {
     if (!body.password || String(body.password).length < 6) {
       return json({ ok: false, reason: "weak_password" }, 400);
     }
+    const lim = guestLimitInput(body.daily_limit);
+    if (!lim.ok) return json({ ok: false, reason: "bad_limit" }, 400);
     const sec = parseDurationSec(body);
     if (sec === null || sec === undefined) return json({ ok: false, reason: "bad_duration" }, 400);
     if (sec === 0) return json({ ok: false, reason: "no_permanent" }, 400);
@@ -89,6 +91,7 @@ export async function onRequestPost({ request, env }) {
       sealed,
       channel: "dist",
       dist: slug,
+      daily_limit: lim.set && lim.value !== null ? lim.value : undefined,
     });
     await putDist(env, slug, { ...dist, used: dist.used + 1 });
     await logEvent(env, "dist_guest_create", username, slug);
@@ -109,6 +112,17 @@ export async function onRequestPost({ request, env }) {
     case "enable":
       await putGuest(env, id, { ...rec, status: "active", ...guestFetchReset() });
       return json({ ok: true });
+    case "set_limit": {
+      // Per-guest daily fetch cap: a number 0..999 (0 = unlimited),
+      // or null to fall back to the global default (10/day).
+      const lim = guestLimitInput(body.daily_limit);
+      if (!lim.ok || !lim.set) return json({ ok: false, reason: "bad_limit" }, 400);
+      const next = { ...rec };
+      if (lim.value === null) delete next.daily_limit;
+      else next.daily_limit = lim.value;
+      await putGuest(env, id, next);
+      return json({ ok: true, daily_limit: lim.value });
+    }
     case "set_expiry": {
       if (!("expires_at" in body)) return json({ ok: false, reason: "bad_expiry" }, 400);
       if (body.expires_at === null) return json({ ok: false, reason: "no_permanent" }, 400);

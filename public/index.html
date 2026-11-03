@@ -148,6 +148,7 @@
           <option value="perm">永久</option>
         </select>
         <input id="gnote" placeholder="备注（可空）" style="width:140px">
+        <input id="glimit" type="number" min="0" max="999" placeholder="每日拉取上限（默认10，0=不限）" style="width:220px">
         <button id="guestCreateBtn">添加游客</button>
         <span id="guestMsg" class="muted"></span>
       </div>
@@ -445,16 +446,18 @@ async function loadGuests() {
   $("guestBody").innerHTML = data.guests.map((g) => {
     const page = `${location.origin}/g/${g.id}`;
     const st = g.status === "disabled" ? "已停用" : (g.expired ? "已到期" : "正常");
+    guestLimitMap[g.id] = g.fetch ? g.fetch.daily_limit : 10;
     return `<tr>
     <td>${g.username}<div class="muted">${g.note || ""}${g.channel === "dist" ? " · 分销" : ""}${g.dist ? "(" + g.dist + ")" : ""}</div></td>
     <td class="mono" data-label="专属页面">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
     <td data-label="到期">${g.expires_at ? fmt(g.expires_at) : "永久"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
-    <td data-label="状态">${st}${g.fetch && g.fetch.auto_disabled ? `<div style="color:#c0392b">自动停用：近7天出现在 ${g.fetch.auto_disabled.regions.length} 个省份<div class="muted">${g.fetch.auto_disabled.regions.join("、")}</div></div>` : ""}<div class="muted">拉取 ${g.fetch ? g.fetch.fetch_count : 0} 次 · 今日 ${g.fetch ? g.fetch.fetch_day_count : 0}/10 次${g.fetch && g.fetch.fetch_count ? ` · 最近 ${g.fetch.last_region || "?"} ${g.fetch.last_fetch_at ? fmt(g.fetch.last_fetch_at) : ""} · 近7天 ${g.fetch.regions_7d.length} 省` : ""}${g.fetch && g.fetch.fetch_day_count >= 10 ? ` · <span style="color:#c0392b">今日超限已停，明日自动恢复</span>` : ""}</div></td>
+    <td data-label="状态">${st}${g.fetch && g.fetch.auto_disabled ? `<div style="color:#c0392b">自动停用：近7天出现在 ${g.fetch.auto_disabled.regions.length} 个省份<div class="muted">${g.fetch.auto_disabled.regions.join("、")}</div></div>` : ""}<div class="muted">拉取 ${g.fetch ? g.fetch.fetch_count : 0} 次 · 今日 ${g.fetch ? g.fetch.fetch_day_count : 0}/${g.fetch && g.fetch.daily_limit === 0 ? "不限" : (g.fetch ? g.fetch.daily_limit : 10)} 次${g.fetch && g.fetch.fetch_count ? ` · 最近 ${g.fetch.last_region || "?"} ${g.fetch.last_fetch_at ? fmt(g.fetch.last_fetch_at) : ""} · 近7天 ${g.fetch.regions_7d.length} 省` : ""}${g.fetch && g.fetch.daily_limit > 0 && g.fetch.fetch_day_count >= g.fetch.daily_limit ? ` · <span style="color:#c0392b">今日超限已停，明日自动恢复</span>` : ""}</div></td>
     <td class="acts">${g.status === "disabled"
       ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>
          <button class="small danger" onclick="guestAct('${g.id}','delete')">删除</button>`
       : `<button class="small danger" onclick="guestAct('${g.id}','disable')">停用</button>`}
       <button class="small ghost" onclick="editGuestExpiry('${g.id}', ${g.expires_at || 0})">修改时间</button>
+      <button class="small ghost" onclick="guestLimit('${g.id}')">拉取上限</button>
       <button class="small ghost" onclick="guestAct('${g.id}','password')">改密码</button></td></tr>`;
   }).join("");
 }
@@ -463,6 +466,20 @@ async function copyGuestPage(page) {
   catch { prompt("复制这个链接发给客户：", page); }
 }
 window.copyGuestPage = copyGuestPage;
+const guestLimitMap = {};
+async function guestLimit(id) {
+  const cur = guestLimitMap[id];
+  const v = prompt(`每日拉取上限（当前：${cur === 0 ? "不限" : (cur ?? 10) + " 次"}）\n填次数（0 = 不限），留空 = 恢复默认 10 次`, cur === 0 ? "0" : String(cur ?? 10));
+  if (v === null) return;
+  const t = v.trim();
+  const body = { id, action: "set_limit", daily_limit: t === "" ? null : Number(t) };
+  if (t !== "" && (!Number.isInteger(body.daily_limit) || body.daily_limit < 0 || body.daily_limit > 999)) { alert("填 0 到 999 的整数"); return; }
+  const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify(body) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  loadGuests();
+}
+window.guestLimit = guestLimit;
+
 async function guestAct(id, action) {
   const body = { id, action };
   if (action === "delete" && !confirm("彻底删除这个游客客户？他的专属页面和订阅链接立即失效、不可恢复。")) return;
@@ -515,6 +532,7 @@ $("guestCreateBtn").onclick = async () => {
     password: $("gpw").value,
     ...durFields("gdurVal", "gdurUnit"),
     note: $("gnote").value.trim(),
+    daily_limit: $("glimit").value === "" ? undefined : Number($("glimit").value),
   };
   if (!body.username) { $("guestMsg").textContent = "用户名必填"; return; }
   if (!body.password) { $("guestMsg").textContent = "密码必填（至少 6 位）"; return; }

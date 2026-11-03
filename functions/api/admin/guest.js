@@ -1,7 +1,7 @@
 import {
   json, readJson, nowSec, isAdmin, sha256hex, getGuest, putGuest, newGuestId,
   bumpDataVersion, cachedPayload, guestFetchView, guestFetchReset,
-  guestProblem, vaultSeal, SLUG_RE, parseDurationSec, parseDeltaSec, durationSeconds, fmtDuration,
+  guestProblem, vaultSeal, SLUG_RE, guestLimitInput, parseDurationSec, parseDeltaSec, durationSeconds, fmtDuration,
 } from "../../lib/core.js";
 
 // GET -> all guests. POST -> create / disable / enable / extend /
@@ -59,6 +59,8 @@ export async function onRequestPost({ request, env }) {
     }
     // Duration: minute-level via durationValue/durationUnit, or the
     // legacy whole-{days} field (0 = permanent). Minimum 1 minute.
+    const lim = guestLimitInput(body.daily_limit);
+    if (!lim.ok) return json({ ok: false, reason: "bad_limit" }, 400);
     const sec = parseDurationSec(body);
     if (sec === null || sec === undefined) return json({ ok: false, reason: "bad_duration" }, 400);
     if (await findByUsername(env, username)) return json({ ok: false, reason: "exists" }, 409);
@@ -82,6 +84,7 @@ export async function onRequestPost({ request, env }) {
       created_at: createdAt,
       expires_at: sec > 0 ? createdAt + sec : null,
       sealed,
+      daily_limit: lim.set && lim.value !== null ? lim.value : undefined,
     });
     return json({ ok: true, id, path: "/g/" + id });
   }
@@ -101,6 +104,17 @@ export async function onRequestPost({ request, env }) {
     case "enable":
       await putGuest(env, id, { ...rec, status: "active", ...guestFetchReset() });
       return json({ ok: true });
+    case "set_limit": {
+      // Per-guest daily fetch cap: a number 0..999 (0 = unlimited),
+      // or null to fall back to the global default (10/day).
+      const lim = guestLimitInput(body.daily_limit);
+      if (!lim.ok || !lim.set) return json({ ok: false, reason: "bad_limit" }, 400);
+      const next = { ...rec };
+      if (lim.value === null) delete next.daily_limit;
+      else next.daily_limit = lim.value;
+      await putGuest(env, id, next);
+      return json({ ok: true, daily_limit: lim.value });
+    }
     case "extend": {
       if (!rec.expires_at) return json({ ok: false, reason: "permanent" }, 400);
       const deltaSec = parseDeltaSec(body);

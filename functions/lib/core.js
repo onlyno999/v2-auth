@@ -444,12 +444,30 @@ export const GUEST_DAILY_LIMIT = 10;
 export function beijingDay(ts) {
   return new Date((ts + 8 * 3600) * 1000).toISOString().slice(0, 10);
 }
+// The daily cap is settable per guest (owner, 2026-11-04): the
+// record's daily_limit wins — unset means the global default,
+// 0 means unlimited.
+export function guestDailyLimit(rec) {
+  if (rec.daily_limit === undefined || rec.daily_limit === null) return GUEST_DAILY_LIMIT;
+  if (rec.daily_limit === 0) return Infinity;
+  return rec.daily_limit;
+}
+// Console input for the limit: absent = leave as-is, null/"" =
+// reset to the default, an integer 0..999 = set it (0 = unlimited).
+export function guestLimitInput(v) {
+  if (v === undefined) return { ok: true, set: false };
+  if (v === null || v === "") return { ok: true, set: true, value: null };
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0 || n > 999) return { ok: false };
+  return { ok: true, set: true, value: n };
+}
 
 export async function noteGuestFetch(env, id, rec, meta) {
   const now = nowSec();
   const today = beijingDay(now);
   const dayCount = rec.fetch_day === today ? rec.fetch_day_count || 0 : 0;
-  if (dayCount >= GUEST_DAILY_LIMIT) {
+  const limit = guestDailyLimit(rec);
+  if (limit !== Infinity && dayCount >= limit) {
     // Blocked fetches are not recorded: retries must not inflate
     // the stats, and the block lifts by itself at midnight.
     return { dailyBlocked: true, disabled: false, dayCount };
@@ -490,6 +508,7 @@ export function guestFetchView(rec) {
   return {
     fetch_count: rec.fetch_count || 0,
     fetch_day_count: rec.fetch_day === beijingDay(now) ? rec.fetch_day_count || 0 : 0,
+    daily_limit: guestDailyLimit(rec) === Infinity ? 0 : guestDailyLimit(rec),
     last_fetch_at: rec.last_fetch_at || null,
     last_ip: rec.last_ip || "",
     last_ua: rec.last_ua || "",
