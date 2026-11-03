@@ -260,15 +260,18 @@ function localTimeText(ts) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 async function editExpiry(machine, expiresAt) {
+  // The format example is generated live (now + 30 days): a frozen
+  // literal looked like a real stored date and confused the seller.
+  const example = localTimeText(Math.floor(Date.now() / 1000) + 30 * 86400);
   const v = prompt(
-    `修改到期时间（当前：${expiresAt ? fmt(expiresAt) : "永久"}）\n按这个格式填：2026-12-03 23:13\n填 0 或“永久” = 改成永久`,
+    `修改到期时间（当前：${expiresAt ? fmt(expiresAt) : "永久"}）\n按这个格式填，例如：${example}\n填 0 或“永久” = 改成永久`,
     expiresAt ? localTimeText(expiresAt) : "");
   if (v === null || v.trim() === "") return;
   const t = v.trim();
   let exp = null;
   if (!(t === "0" || t === "永久" || t.toLowerCase() === "permanent")) {
     const m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-    if (!m) { alert("格式不对，按 2026-12-03 23:13 这样填"); return; }
+    if (!m) { alert("格式不对，按 " + example + " 这样填"); return; }
     const dt = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
     if (isNaN(dt.getTime())) { alert("这个时间不对，检查一下"); return; }
     exp = Math.floor(dt.getTime() / 1000);
