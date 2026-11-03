@@ -1,0 +1,7 @@
+ADMIN_PASSWORD=local-test-password
+ADMIN_SECRET=local-test-header-secret
+SESSION_SECRET=replace-with-long-random-hex
+SUB_URL=https://example.com/your-subscription-url
+EXPECTED_PACKAGE=com.v2ray.ang.fdroid
+EXPECTED_CERT_SHA256=221f4dd0cfef8b76785ffc82ada95b23961553927aadbcc920395fdbd119758a
+ATTEST_REQUIRED=0

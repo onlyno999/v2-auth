@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v2one999 授权后台</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; background: #f4f5f7; color: #1c2333; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 20px; margin: 8px 0 16px; }
+  h2 { font-size: 15px; margin: 22px 0 10px; color: #334; }
+  .card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(20,30,60,.08); }
+  input, select { padding: 8px 10px; border: 1px solid #ccd2dd; border-radius: 6px; font-size: 14px; }
+  button { padding: 8px 14px; border: 0; border-radius: 6px; background: #14181f; color: #fff; font-size: 14px; cursor: pointer; }
+  button.ghost { background: #e8ebf0; color: #1c2333; }
+  button.danger { background: #c0392b; }
+  button.small { padding: 4px 9px; font-size: 12px; margin-right: 4px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #eceef2; vertical-align: top; }
+  th { color: #667; font-weight: 600; }
+  .mono { font-family: ui-monospace, Consolas, monospace; }
+  .code { font-size: 20px; font-weight: 700; letter-spacing: 1px; background: #fff8e6; border: 1px dashed #d9a441; padding: 10px 14px; border-radius: 8px; display: inline-block; }
+  .tag { padding: 1px 7px; border-radius: 9px; font-size: 12px; background: #e8f5e9; color: #22733a; }
+  .tag.revoked { background: #fdecea; color: #b03a2e; }
+  .tag.issued { background: #eef2fb; color: #33519c; }
+  .muted { color: #889; font-size: 12px; }
+  .hidden { display: none; }
+  #msg { margin: 10px 0; color: #b03a2e; min-height: 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>v2one999 授权后台</h1>
+
+  <div id="loginBox" class="card">
+    <div class="row">
+      <input id="pw" type="password" placeholder="管理员密码" style="flex:1;min-width:200px">
+      <button id="loginBtn">登录</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <div id="console" class="hidden">
+    <h2>给新用户激活</h2>
+    <div class="card">
+      <div class="row">
+        <input id="mc" placeholder="用户的机器码" style="flex:2;min-width:220px" class="mono">
+        <select id="days">
+          <option value="30">30 天</option>
+          <option value="90">90 天</option>
+          <option value="180">180 天</option>
+          <option value="365" selected>365 天</option>
+          <option value="0">永久</option>
+        </select>
+        <input id="note" placeholder="备注（客户名）" style="flex:1;min-width:140px">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="issueBtn">生成激活码</button>
+        <button id="openBtn" class="ghost">直接开通（免输码）</button>
+        <span id="issueMsg" class="muted"></span>
+      </div>
+      <div id="codeOut" style="margin-top:12px" class="hidden">
+        <span class="code mono" id="codeText"></span>
+        <button id="copyBtn" class="ghost small">复制</button>
+        <div class="muted" style="margin-top:6px">把这个码发给用户，他在客户端输一次就行。码已和上面这台机器绑定，别人用不了。</div>
+      </div>
+    </div>
+
+    <h2>设备总表 <button id="refreshBtn" class="ghost small">刷新</button></h2>
+    <div id="pendingBox" class="card hidden" style="margin-bottom:10px"></div>
+    <div class="card">
+      <table>
+        <thead><tr>
+          <th>机器码 / 备注</th><th>平台</th><th>激活</th><th>到期</th>
+          <th>最近打开</th><th>拉取</th><th>状态</th><th>操作</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="8" class="muted">加载中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const api = async (path, opts = {}) => {
+  const r = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
+  return { status: r.status, data: await r.json().catch(() => ({})) };
+};
+const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString("zh-CN", { hour12: false }) : "—";
+
+async function doLogin() {
+  const { status, data } = await api("/api/admin/login", {
+    method: "POST", body: JSON.stringify({ password: $("pw").value }),
+  });
+  if (status === 200 && data.ok) {
+    $("loginBox").classList.add("hidden");
+    $("console").classList.remove("hidden");
+    loadDevices();
+  } else {
+    $("msg").textContent = "密码不对";
+  }
+}
+$("loginBtn").onclick = doLogin;
+$("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+
+$("issueBtn").onclick = async () => {
+  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), mode: "code" };
+  if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
+  const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
+  if (data.ok) {
+    $("codeText").textContent = data.code;
+    $("codeOut").classList.remove("hidden");
+    $("issueMsg").textContent = "";
+  } else $("issueMsg").textContent = "失败：" + (data.reason || "");
+};
+$("openBtn").onclick = async () => {
+  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), mode: "open" };
+  if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
+  const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
+  $("issueMsg").textContent = data.ok ? "已开通：让用户在客户端点「我已付款」即可进入" : "失败：" + (data.reason || "");
+  if (data.ok) loadDevices();
+};
+$("copyBtn").onclick = () => navigator.clipboard.writeText($("codeText").textContent);
+
+async function act(machine, action, days) {
+  const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action, days }) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  loadDevices();
+}
+window.act = act;
+
+async function loadDevices() {
+  const { data } = await api("/api/admin/devices");
+  if (!data.ok) { $("tbody").innerHTML = '<tr><td colspan="8">未登录或加载失败</td></tr>'; return; }
+  const pb = $("pendingBox");
+  if (data.pending_open && data.pending_open.length) {
+    pb.classList.remove("hidden");
+    pb.innerHTML = "待领取开通（用户还没点「我已付款」）：<span class='mono'>" + data.pending_open.join("</span>, <span class='mono'>") + "</span>";
+  } else pb.classList.add("hidden");
+  if (!data.devices.length) {
+    $("tbody").innerHTML = '<tr><td colspan="8" class="muted">还没有设备</td></tr>';
+    return;
+  }
+  $("tbody").innerHTML = data.devices.map((d) => {
+    const lic = d.lic || {};
+    const st = lic.status || "—";
+    const boot = d.integrity && d.integrity.boot && d.integrity.boot.deviceLocked === false
+      ? '<div class="muted" style="color:#b03a2e">设备已解锁/root 标记</div>' : "";
+    return `<tr>
+      <td class="mono">${d.machine}<div class="muted">${lic.note || ""}</div>${boot}</td>
+      <td>${d.platform || "—"}</td>
+      <td>${fmt(lic.activated_at)}</td>
+      <td>${lic.expires_at ? fmt(lic.expires_at) : (lic.days === 0 ? "永久" : "—")}</td>
+      <td>${fmt(d.last_seen)}</td>
+      <td>${d.pulls}</td>
+      <td><span class="tag ${st === "revoked" ? "revoked" : st === "issued" ? "issued" : ""}">${st}</span></td>
+      <td>
+        ${st === "revoked"
+          ? `<button class="small ghost" onclick="act('${d.machine}','restore')">恢复</button>`
+          : `<button class="small danger" onclick="act('${d.machine}','revoke')">停用</button>`}
+        <button class="small ghost" onclick="act('${d.machine}','unbind')">解绑</button>
+        <button class="small ghost" onclick="act('${d.machine}','extend',30)">+30天</button>
+      </td></tr>`;
+  }).join("");
+}
+$("refreshBtn").onclick = loadDevices;
+</script>
+</body>
+</html>

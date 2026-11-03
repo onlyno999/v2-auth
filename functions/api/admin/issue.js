@@ -1,0 +1,33 @@
+import {
+  json, readJson, nowSec, isAdmin, newLicenseCode, codeKey, logEvent,
+} from "../../lib/core.js";
+
+// POST {machineCode, days, note, mode: "code"|"open"}  (admin)
+// mode "code": returns a license code pre-bound to the machine.
+// mode "open": direct-open — the user claims it from the app.
+export async function onRequestPost({ request, env }) {
+  if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
+  const body = await readJson(request);
+  if (!body.machineCode) return json({ ok: false, reason: "no_machine" }, 400);
+  const days = Number.isFinite(body.days) ? Math.max(0, Math.floor(body.days)) : 30;
+  const code = newLicenseCode();
+  const key = await codeKey(code);
+  const mode = body.mode === "open" ? "open" : "code";
+  const rec = {
+    days,
+    status: mode === "open" ? "open" : "issued",
+    machine: body.machineCode,
+    note: body.note || "",
+    created_at: nowSec(),
+    activated_at: null,
+    expires_at: null,
+  };
+  await env.KV.put(key, JSON.stringify(rec));
+  if (mode === "open") {
+    await env.KV.put("open:" + body.machineCode, key);
+    await logEvent(env, "admin_open", body.machineCode, `${days}d`);
+    return json({ ok: true, mode });
+  }
+  await logEvent(env, "admin_issue", body.machineCode, `${days}d`);
+  return json({ ok: true, mode, code });
+}

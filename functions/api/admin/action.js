@@ -1,0 +1,48 @@
+import {
+  json, readJson, nowSec, isAdmin, getDev, getLicByKey, putLic, logEvent,
+} from "../../lib/core.js";
+
+// POST {machineCode, action: revoke|restore|unbind|extend, days?}  (admin)
+export async function onRequestPost({ request, env }) {
+  if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
+  const body = await readJson(request);
+  const machine = body.machineCode;
+  if (!machine) return json({ ok: false, reason: "no_machine" }, 400);
+  const dev = await getDev(env, machine);
+  const licKey = dev?.lic || (await env.KV.get("open:" + machine));
+  const lic = licKey ? await getLicByKey(env, licKey) : null;
+
+  switch (body.action) {
+    case "revoke": {
+      if (!lic) return json({ ok: false, reason: "not_found" }, 404);
+      await putLic(env, { ...lic, status: "revoked" });
+      await logEvent(env, "admin_revoke", machine);
+      return json({ ok: true });
+    }
+    case "restore": {
+      if (!lic) return json({ ok: false, reason: "not_found" }, 404);
+      await putLic(env, { ...lic, status: dev ? "active" : "issued" });
+      await logEvent(env, "admin_restore", machine);
+      return json({ ok: true });
+    }
+    case "unbind": {
+      await env.KV.delete("dev:" + machine);
+      await env.KV.delete("open:" + machine);
+      if (lic && lic.status !== "revoked") {
+        await putLic(env, { ...lic, status: "issued", activated_at: lic.activated_at });
+      }
+      await logEvent(env, "admin_unbind", machine);
+      return json({ ok: true });
+    }
+    case "extend": {
+      if (!lic) return json({ ok: false, reason: "not_found" }, 404);
+      if (!lic.expires_at) return json({ ok: false, reason: "permanent" }, 400);
+      const add = Math.floor(body.days || 0);
+      await putLic(env, { ...lic, expires_at: lic.expires_at + add * 86400 });
+      await logEvent(env, "admin_extend", machine, `${add}d`);
+      return json({ ok: true, expires_at: lic.expires_at + add * 86400, now: nowSec() });
+    }
+    default:
+      return json({ ok: false, reason: "bad_action" }, 400);
+  }
+}
