@@ -130,7 +130,7 @@
       </div>
       <div class="muted" style="margin:8px 0">添加后，他的专用链接就是本站域名后面加 /标识，例如 https://你的域名/mmm —— 密码不用你管：他第一次打开链接时自己设置（存服务器，你看不到）；他只能给自己客户发码（走分销订阅）、看自己的客户；发码扣额度，最多 365 天。</div>
       <table>
-        <thead><tr><th>标识 / 名称</th><th>登录地址</th><th>额度</th><th>状态</th><th>操作</th></tr></thead>
+        <thead><tr><th>登录地址</th><th>额度</th><th>状态</th><th>操作</th><th>标识 / 名称</th></tr></thead>
         <tbody id="distBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
       </table>
     </div>
@@ -389,7 +389,6 @@ async function loadDists() {
     return;
   }
   $("distBody").innerHTML = data.distributors.map((d) => `<tr>
-    <td class="mono">${d.slug}<div class="muted">${d.name || ""}</div></td>
     <td class="mono" data-label="登录地址">${location.origin}/${d.slug}</td>
     <td data-label="额度">${d.used} / ${d.quota < 0 ? "不限" : d.quota}</td>
     <td data-label="状态">${!d.has_pw ? "待他设密码" : (d.status === "active" ? "正常" : "已停用")}</td>
@@ -399,7 +398,8 @@ async function loadDists() {
          <button class="small danger" onclick="distAct('${d.slug}','delete')">删除账户</button>`}
       <button class="small ghost" onclick="distAct('${d.slug}','resetpw')">重置密码</button>
       <button class="small ghost" onclick="distAct('${d.slug}','rename')">改名</button>
-      <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button></td></tr>`).join("");
+      <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button></td>
+    <td class="mono" data-label="标识 / 名称">${d.slug}<div class="muted">${d.name || ""}</div></td></tr>`).join("");
 }
 async function distAct(slug, action) {
   const body = { slug, action };
