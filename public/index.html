@@ -138,18 +138,6 @@
       </table>
     </div>
 
-    <div id="treeBox" class="hidden">
-      <h2 id="treeTitle">名下</h2>
-      <div class="card">
-        <div class="row" style="margin-bottom:8px">
-          <button class="ghost small" id="treeBackBtn" onclick="treeBack()">← 返回上一级</button>
-          <button class="ghost small" onclick="closeTree()">收起</button>
-          <span id="treeSummary" class="muted"></span>
-        </div>
-        <div id="treeContent"></div>
-      </div>
-    </div>
-
     <h2>游客客户（小火箭等第三方客户端）</h2>
     <div class="card">
       <div class="row">
@@ -452,7 +440,7 @@ async function loadDists() {
       <button class="small ghost" onclick="distAct('${d.slug}','rename')">改名</button>
       <button class="small ghost" onclick="distAct('${d.slug}','reslug')">标识</button>
       <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button>
-      <button class="small ghost" onclick="openTree('${d.slug}')">看名下</button></td>
+      <button class="small ghost" onclick="location.href='/tree.html?slug=${d.slug}'">看名下</button></td>
     <td class="mono" data-label="标识 / 名称">${d.slug}<div class="muted">${d.name || ""}</div><div class="muted">第${d.level || 1}级${d.parent ? " · 上级 " + d.parent : " · 总后台直开"} · 下级 ${d.children || 0}/3</div></td></tr>`).join("");
   applyFilter("qDists", "distBody");
 }
@@ -481,84 +469,6 @@ async function distAct(slug, action) {
 }
 window.distAct = distAct;
 
-// ---------- distributor subtree drill-down （看名下） ----------
-let treePath = [];
-async function openTree(slug, push = true) {
-  if (push && treePath[treePath.length - 1] !== slug) treePath.push(slug);
-  const { data } = await api("/api/admin/dist_tree?slug=" + encodeURIComponent(slug));
-  if (!data.ok) { alert("加载失败：" + (data.reason || "")); return; }
-  const box = $("treeBox");
-  box.classList.remove("hidden");
-  $("treeBackBtn").style.display = treePath.length > 1 ? "" : "none";
-  $("treeTitle").textContent = `名下：${data.dist.name || data.dist.slug}（${data.dist.slug} · 第${data.dist.level}级）`;
-  $("treeSummary").textContent = `整个下面共 ${data.totals.devices + data.totals.guests} 个用户：客户 ${data.totals.devices} 台 · 游客 ${data.totals.guests} 个 · 下级分销商 ${data.totals.subs} 个（直属：客户 ${data.devices.length} 台 · 待激活 ${data.pending} · 游客 ${data.guests.length} 个 · 下级 ${data.subs.length} 个）`;
-  const devRows = data.devices.length ? data.devices.map((d) => `<tr>
-      <td class="mono">${d.machine}<div class="muted">${d.note || ""}</div></td>
-      <td data-label="到期">${d.expires_at ? fmt(d.expires_at) : "永久"}</td>
-      <td data-label="状态">${d.status === "revoked" ? "已停用" : "正常"}</td>
-      <td class="acts">${d.status === "revoked"
-        ? `<button class="small ghost" onclick="treeDevAct('${d.machine}','restore')">恢复</button>`
-        : `<button class="small danger" onclick="treeDevAct('${d.machine}','revoke')">停用线路</button>`}</td></tr>`).join("")
-    : '<tr><td colspan="4" class="muted">没有直属客户</td></tr>';
-  const guestRows = data.guests.length ? data.guests.map((g) => `<tr>
-      <td>${g.username}</td>
-      <td data-label="到期">${g.expires_at ? fmt(g.expires_at) : "永久"}</td>
-      <td data-label="状态">${g.status === "disabled" ? "已停用" : "正常"}</td>
-      <td class="acts">${g.status === "disabled"
-        ? `<button class="small ghost" onclick="treeGuestAct('${g.id}','enable')">恢复</button>`
-        : `<button class="small danger" onclick="treeGuestAct('${g.id}','disable')">停用线路</button>`}</td></tr>`).join("")
-    : '<tr><td colspan="4" class="muted">没有直属游客</td></tr>';
-  const subRows = data.subs.length ? data.subs.map((x) => `<tr>
-      <td class="mono">${x.slug}<div class="muted">${x.name || ""}</div></td>
-      <td data-label="名下">客户 ${x.devices} 台${x.pending ? "（待激活 " + x.pending + "）" : ""} · 游客 ${x.guests} 个 · 下级 ${x.children} 个</td>
-      <td data-label="状态">${x.status === "disabled" ? "已停用" : "正常"}</td>
-      <td class="acts">
-        <button class="small ghost" onclick="openTree('${x.slug}')">进去看</button>
-        ${x.status === "disabled"
-          ? `<button class="small ghost" onclick="treeSubAct('${x.slug}','enable')">恢复</button>`
-          : `<button class="small danger" onclick="treeSubAct('${x.slug}','disable')">停用</button>`}</td></tr>`).join("")
-    : '<tr><td colspan="4" class="muted">没有下级分销商</td></tr>';
-  $("treeContent").innerHTML = `
-    <h3>客户（设备）</h3>
-    <table><thead><tr><th>机器码 / 备注</th><th>到期</th><th>状态</th><th>操作</th></tr></thead><tbody>${devRows}</tbody></table>
-    <h3>游客</h3>
-    <table><thead><tr><th>用户名</th><th>到期</th><th>状态</th><th>操作</th></tr></thead><tbody>${guestRows}</tbody></table>
-    <h3>下级分销商</h3>
-    <table><thead><tr><th>标识 / 名称</th><th>名下</th><th>状态</th><th>操作</th></tr></thead><tbody>${subRows}</tbody></table>`;
-  box.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-window.openTree = openTree;
-function treeBack() {
-  treePath.pop();
-  const prev = treePath[treePath.length - 1];
-  if (prev) openTree(prev, false);
-  else closeTree();
-}
-window.treeBack = treeBack;
-function closeTree() {
-  treePath = [];
-  $("treeBox").classList.add("hidden");
-}
-window.closeTree = closeTree;
-async function treeDevAct(machine, action) {
-  if (action === "revoke" && !confirm(`停用 ${machine} 的线路？他的客户端立刻用不了（可恢复）。`)) return;
-  const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action }) });
-  if (!data.ok) alert("失败：" + (data.reason || ""));
-  openTree(treePath[treePath.length - 1], false);
-}
-window.treeDevAct = treeDevAct;
-async function treeGuestAct(id, action) {
-  const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify({ id, action }) });
-  if (!data.ok) alert("失败：" + (data.reason || ""));
-  openTree(treePath[treePath.length - 1], false);
-}
-window.treeGuestAct = treeGuestAct;
-async function treeSubAct(slug, action) {
-  const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify({ slug, action }) });
-  if (!data.ok) alert("失败：" + (data.reason || ""));
-  openTree(treePath[treePath.length - 1], false);
-}
-window.treeSubAct = treeSubAct;
 $("distCreateBtn").onclick = async () => {
   const body = {
     action: "create",

@@ -424,7 +424,7 @@ export function distLevel(rec) {
   return rec && Number.isFinite(rec.level) ? rec.level : 1;
 }
 export const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,23}$/;
-export const RESERVED_SLUGS = new Set(["api", "index", "dist", "admin", "assets", "guest", "s", "g"]);
+export const RESERVED_SLUGS = new Set(["api", "index", "dist", "admin", "assets", "guest", "s", "g", "tree", "subtree"]);
 
 export async function distSessionCookie(env, slug, days = 1) {
   const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + days * 86400, dist: slug })));
