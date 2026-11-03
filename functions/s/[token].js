@@ -32,7 +32,7 @@ export async function onRequestGet({ request, env, params }) {
     return deny(problem);
   }
 
-  const content = await serveSubscription(env, "main");
+  const content = await serveSubscription(env, rec.channel === "dist" ? "dist" : "main");
   if (!content) return deny("sub_unavailable", 502);
   return new Response(content, {
     status: 200,

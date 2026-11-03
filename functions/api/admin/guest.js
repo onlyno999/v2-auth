@@ -19,6 +19,7 @@ export async function onRequestGet({ request, env }) {
     out.push({
       id: k.name.slice(4),
       username: rec.username, note: rec.note || "", days: rec.days,
+      channel: rec.channel || "main", dist: rec.dist || null,
       duration_sec: rec.duration_sec ?? null,
       duration_text: fmtDuration(durationSeconds(rec)),
       status: rec.status, created_at: rec.created_at, expires_at: rec.expires_at,

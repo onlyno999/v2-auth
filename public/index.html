@@ -384,7 +384,7 @@ async function loadGuests() {
     const page = `${location.origin}/g/${g.id}`;
     const st = g.status === "disabled" ? "已停用" : (g.expired ? "已到期" : "正常");
     return `<tr>
-    <td>${g.username}<div class="muted">${g.note || ""}</div></td>
+    <td>${g.username}<div class="muted">${g.note || ""}${g.channel === "dist" ? " · 分销" : ""}${g.dist ? "(" + g.dist + ")" : ""}</div></td>
     <td class="mono">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
     <td>${g.expires_at ? fmt(g.expires_at) : "永久"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
     <td>${st}</td>

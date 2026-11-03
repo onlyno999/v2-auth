@@ -427,5 +427,37 @@ if (legacyFx) {
   check("tampered legacy code refused", convBad.status === 403);
 }
 
+// ---- distributor-managed guests ----
+const createDistG = await j("/api/admin/dist", { action: "create", slug: "ggg", name: "游客分销", password: "dist-guest-pw", quota: 3 }, { cookie });
+const dgLoginRes = await fetch(BASE + "/api/dist/login", {
+  method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ slug: "ggg", password: "dist-guest-pw" }),
+});
+const dgCookie = (dgLoginRes.headers.get("set-cookie") || "").split(";")[0];
+check("dist guest: distributor ready", createDistG.status === 200 && dgCookie.startsWith("dsess="));
+const dgCreate = await j("/api/dist/guest", { action: "create", username: "分销游客甲", password: "guest-pw-9", durationValue: 30, durationUnit: "day" }, { cookie: dgCookie });
+check("dist creates guest", dgCreate.status === 200 && !!dgCreate.data.id, JSON.stringify(dgCreate.data).slice(0, 80));
+const DGID = dgCreate.data.id;
+const dgMe0 = await fetch(BASE + "/api/dist/me", { headers: { cookie: dgCookie } }).then((r) => r.json());
+check("dist guest consumes one quota", dgMe0.ok === true && dgMe0.used === 1 && dgMe0.remaining === 2, JSON.stringify(dgMe0).slice(0, 80));
+const dgLogin = await j("/api/guest/login", { id: DGID, password: "guest-pw-9" });
+const dgMe = await (await fetch(BASE + "/api/guest/me", { headers: { "x-gsess": dgLogin.data.session } })).json();
+const dgFetch = await fetch(dgMe.link);
+check("dist guest link serves DIST subscription", dgFetch.status === 200 && (await dgFetch.text()) === expectedDist);
+const dgPerm = await j("/api/dist/guest", { action: "create", username: "分销游客乙", password: "guest-pw-9", days: 0 }, { cookie: dgCookie });
+check("dist guest permanent rejected", dgPerm.status === 400);
+const dgYear = await j("/api/dist/guest", { action: "create", username: "分销游客乙", password: "guest-pw-9", durationValue: 366, durationUnit: "day" }, { cookie: dgCookie });
+check("dist guest over 365 days rejected", dgYear.status === 400);
+const dgPermExp = await j("/api/dist/guest", { id: DGID, action: "set_expiry", expires_at: null }, { cookie: dgCookie });
+check("dist guest set_expiry permanent rejected", dgPermExp.status === 400);
+const dgAdminTouch = await j("/api/dist/guest", { id: GID, action: "disable" }, { cookie: dgCookie });
+check("dist cannot touch admin guest", dgAdminTouch.status === 404);
+await j("/api/dist/guest", { id: DGID, action: "disable" }, { cookie: dgCookie });
+check("dist guest link dies on disable", (await fetch(dgMe.link)).status === 403);
+await j("/api/dist/guest", { id: DGID, action: "enable" }, { cookie: dgCookie });
+check("dist guest link revives on enable", (await fetch(dgMe.link)).status === 200);
+const dgList = await fetch(BASE + "/api/admin/guest", { headers: { cookie } }).then((r) => r.json());
+check("admin sees dist guest with owner", (dgList.guests || []).some((g) => g.id === DGID && g.dist === "ggg"));
+
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);
 process.exit(fail ? 1 : 0);

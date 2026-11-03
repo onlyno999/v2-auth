@@ -80,6 +80,28 @@
         <tbody id="tbody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
       </table>
     </div>
+
+    <h2>游客客户（小火箭等第三方客户端）</h2>
+    <div class="card">
+      <div class="row">
+        <input id="guser" placeholder="用户名（客户名）" style="width:150px">
+        <input id="gpw" type="password" placeholder="密码（至少 6 位）" style="width:150px">
+        <input id="gdurVal" type="number" value="30" min="1" style="width:80px">
+        <select id="gdurUnit">
+          <option value="minute">分钟</option>
+          <option value="hour">小时</option>
+          <option value="day" selected>天</option>
+        </select>
+        <input id="gnote" placeholder="备注（可空）" style="width:130px">
+        <button id="guestCreateBtn">添加游客</button>
+        <span id="guestMsg" class="muted"></span>
+      </div>
+      <div class="muted" style="margin:8px 0">添加后把「专属页面」链接发给客户：他打开先输密码，进去只能看到自己还剩多少时间、复制他自己的订阅链接，真实订阅地址不显示。添加游客占 1 个额度；最长 365 天。停用 / 到期后他的订阅链接立刻失效；删除要先停用。</div>
+      <table>
+        <thead><tr><th>用户名 / 备注</th><th>专属页面</th><th>到期</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="guestBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -114,6 +136,7 @@ async function loadMe() {
     $("loginBox").classList.add("hidden");
     $("console").classList.remove("hidden");
     loadDevices();
+    loadGuests();
   }
 }
 async function doLogin() {
@@ -164,7 +187,7 @@ $("openBtn").onclick = async () => {
   const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), mode: "open" };
   if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
   const { data } = await api("/api/dist/issue", { method: "POST", body: JSON.stringify(body) });
-  $("issueMsg").textContent = data.ok ? "已开通：让客户在客户端点「我已付款」即可进入" : "失败：" + (data.reason || "");
+  $("issueMsg").textContent = data.ok ? "已开通：让客户在客户端点「直接开通（卖家已开通时点这里）」即可进入" : "失败：" + (data.reason || "");
   if (data.ok) loadMe();
 };
 $("copyBtn").onclick = () => navigator.clipboard.writeText($("codeText").textContent);
@@ -181,6 +204,85 @@ async function loadDevices() {
     <td>${d.lic.status}</td></tr>`).join("");
 }
 $("refreshBtn").onclick = loadDevices;
+
+async function loadGuests() {
+  const { data } = await api("/api/dist/guest");
+  if (!data.ok) { $("guestBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
+  if (!data.guests.length) {
+    $("guestBody").innerHTML = '<tr><td colspan="5" class="muted">还没有游客客户</td></tr>';
+    return;
+  }
+  $("guestBody").innerHTML = data.guests.map((g) => {
+    const page = `${location.origin}/g/${g.id}`;
+    const st = g.status === "disabled" ? "已停用" : (g.expired ? "已到期" : "正常");
+    return `<tr>
+    <td>${g.username}<div class="muted">${g.note || ""}</div></td>
+    <td class="mono">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
+    <td>${g.expires_at ? fmt(g.expires_at) : "—"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
+    <td>${st}</td>
+    <td>${g.status === "disabled"
+      ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>
+         <button class="small danger" onclick="guestAct('${g.id}','delete')">删除</button>`
+      : `<button class="small danger" onclick="guestAct('${g.id}','disable')">停用</button>`}
+      <button class="small ghost" onclick="editGuestExpiry('${g.id}', ${g.expires_at || 0})">修改时间</button>
+      <button class="small ghost" onclick="guestAct('${g.id}','password')">改密码</button></td></tr>`;
+  }).join("");
+}
+async function copyGuestPage(page) {
+  try { await navigator.clipboard.writeText(page); alert("已复制专属页面链接：" + page); }
+  catch { prompt("复制这个链接发给客户：", page); }
+}
+window.copyGuestPage = copyGuestPage;
+async function guestAct(id, action) {
+  const body = { id, action };
+  if (action === "delete" && !confirm("彻底删除这个游客客户？他的专属页面和订阅链接立即失效、不可恢复。")) return;
+  if (action === "password") {
+    const p = prompt("给他设置新密码（至少 6 位）：");
+    if (p === null || p === "") return;
+    body.password = p;
+  }
+  const { data } = await api("/api/dist/guest", { method: "POST", body: JSON.stringify(body) });
+  if (!data.ok) alert("失败：" + (data.reason === "disable_first" ? "先停用才能删除" : data.reason || ""));
+  loadGuests();
+}
+window.guestAct = guestAct;
+const pad2 = (n) => String(n).padStart(2, "0");
+function localTimeTextSec(ts) {
+  const d = new Date(ts * 1000);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+async function editGuestExpiry(id, expiresAt) {
+  const v = prompt(
+    `修改到期时间（当前：${expiresAt ? fmt(expiresAt) : "—"}）\n按这个格式填，精确到秒：2026-11-04 01:17:44`,
+    expiresAt ? localTimeTextSec(expiresAt) : "");
+  if (v === null || v.trim() === "") return;
+  const m = v.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) { alert("格式不对，按 2026-11-04 01:17:44 这样填"); return; }
+  const dt = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+  if (isNaN(dt.getTime())) { alert("这个时间不对，检查一下"); return; }
+  const exp = Math.floor(dt.getTime() / 1000);
+  const { data } = await api("/api/dist/guest", { method: "POST", body: JSON.stringify({ id, action: "set_expiry", expires_at: exp }) });
+  if (!data.ok) alert("失败：" + (data.reason === "days_range" ? "最长只能设到 365 天后" : data.reason || ""));
+  loadGuests();
+}
+window.editGuestExpiry = editGuestExpiry;
+$("guestCreateBtn").onclick = async () => {
+  const body = {
+    action: "create",
+    username: $("guser").value.trim(),
+    password: $("gpw").value,
+    durationValue: Number($("gdurVal").value || 0),
+    durationUnit: $("gdurUnit").value,
+    note: $("gnote").value.trim(),
+  };
+  if (!body.username) { $("guestMsg").textContent = "用户名必填"; return; }
+  if (!body.password) { $("guestMsg").textContent = "密码必填（至少 6 位）"; return; }
+  const { data } = await api("/api/dist/guest", { method: "POST", body: JSON.stringify(body) });
+  $("guestMsg").textContent = data.ok
+    ? `已添加：把 ${location.origin}${data.path} 发给客户`
+    : "失败：" + (data.reason === "exists" ? "用户名已存在" : data.reason === "quota_exhausted" ? "额度用完了，联系上级补充" : data.reason || "");
+  if (data.ok) { loadGuests(); loadMe(); }
+};
 (async () => {
   const me = await api("/api/dist/me");
   if (me.data && me.data.ok) { loadMe(); return; }
