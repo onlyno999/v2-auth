@@ -392,7 +392,7 @@ async function loadGuests() {
       ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>
          <button class="small danger" onclick="guestAct('${g.id}','delete')">删除</button>`
       : `<button class="small danger" onclick="guestAct('${g.id}','disable')">停用</button>`}
-      <button class="small ghost" onclick="guestAct('${g.id}','extend')">延期</button>
+      <button class="small ghost" onclick="editGuestExpiry('${g.id}', ${g.expires_at || 0})">修改时间</button>
       <button class="small ghost" onclick="guestAct('${g.id}','password')">改密码</button></td></tr>`;
   }).join("");
 }
@@ -419,6 +419,33 @@ async function guestAct(id, action) {
   loadGuests();
 }
 window.guestAct = guestAct;
+
+// Guest expiry, hand-edited to the second: type the exact moment
+// (date + time, down to seconds), or 0 / 永久 for permanent. A past
+// moment expires the guest at once.
+function localTimeTextSec(ts) {
+  const d = new Date(ts * 1000);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+async function editGuestExpiry(id, expiresAt) {
+  const v = prompt(
+    `修改到期时间（当前：${expiresAt ? fmt(expiresAt) : "永久"}）\n按这个格式填，精确到秒：2026-11-04 01:17:44\n填 0 或“永久” = 改成永久`,
+    expiresAt ? localTimeTextSec(expiresAt) : "");
+  if (v === null || v.trim() === "") return;
+  const t = v.trim();
+  let exp = null;
+  if (!(t === "0" || t === "永久" || t.toLowerCase() === "permanent")) {
+    const m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) { alert("格式不对，按 2026-11-04 01:17:44 这样填"); return; }
+    const dt = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+    if (isNaN(dt.getTime())) { alert("这个时间不对，检查一下"); return; }
+    exp = Math.floor(dt.getTime() / 1000);
+  }
+  const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify({ id, action: "set_expiry", expires_at: exp }) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  loadGuests();
+}
+window.editGuestExpiry = editGuestExpiry;
 $("guestCreateBtn").onclick = async () => {
   const body = {
     action: "create",

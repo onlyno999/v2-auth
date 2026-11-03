@@ -373,6 +373,13 @@ const gmLoginExpired = await j("/api/guest/login", { id: GMID, password: "guest-
 check("expired guest cannot log in", gmLoginExpired.status === 403 && gmLoginExpired.data.reason === "expired");
 await j("/api/admin/guest", { id: GMID, action: "extend", days: 2 }, { cookie });
 check("guest link alive again after extend", (await fetch(gmMe.link)).status === 200);
+// guest manual expiry edit （修改时间， precise to the second)
+const gSetPast = await j("/api/admin/guest", { id: GMID, action: "set_expiry", expires_at: nowS - 5 }, { cookie });
+check("guest set_expiry to past kills link", gSetPast.status === 200 && (await fetch(gmMe.link)).status === 403);
+const gSetFuture = await j("/api/admin/guest", { id: GMID, action: "set_expiry", expires_at: nowS + 3600 }, { cookie });
+check("guest set_expiry to future revives link", gSetFuture.status === 200 && gSetFuture.data.expires_at === nowS + 3600 && (await fetch(gmMe.link)).status === 200);
+const gSetBad = await j("/api/admin/guest", { id: GMID, action: "set_expiry", expires_at: "xyz" }, { cookie });
+check("guest set_expiry rejects garbage", gSetBad.status === 400);
 await j("/api/admin/guest", { id: GMID, action: "disable" }, { cookie });
 await j("/api/admin/guest", { id: GMID, action: "delete" }, { cookie });
 

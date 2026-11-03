@@ -101,6 +101,24 @@ export async function onRequestPost({ request, env }) {
       await putGuest(env, id, { ...rec, expires_at });
       return json({ ok: true, expires_at });
     }
+    case "set_expiry": {
+      // Manual edit of the expiry moment itself (the console's
+      // 修改时间 button for guests): an absolute epoch-second
+      // deadline — date, hour, minute and second all editable — or
+      // null for permanent. A past moment expires him at once.
+      if (!("expires_at" in body)) return json({ ok: false, reason: "bad_expiry" }, 400);
+      if (body.expires_at === null) {
+        await putGuest(env, id, { ...rec, expires_at: null, days: 0, duration_sec: null });
+        return json({ ok: true, expires_at: null });
+      }
+      const expires_at = Number(body.expires_at);
+      if (!Number.isFinite(expires_at) || Math.floor(expires_at) !== expires_at || expires_at <= 0) {
+        return json({ ok: false, reason: "bad_expiry" }, 400);
+      }
+      const days = Math.max(0, Math.ceil((expires_at - nowSec()) / 86400));
+      await putGuest(env, id, { ...rec, expires_at, days });
+      return json({ ok: true, expires_at });
+    }
     case "password":
       if (!body.password || String(body.password).length < 6) {
         return json({ ok: false, reason: "weak_password" }, 400);
