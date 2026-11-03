@@ -440,7 +440,7 @@ async function loadDists() {
       <button class="small ghost" onclick="distAct('${d.slug}','rename')">改名</button>
       <button class="small ghost" onclick="distAct('${d.slug}','reslug')">标识</button>
       <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button></td>
-    <td class="mono" data-label="标识 / 名称">${d.slug}<div class="muted">${d.name || ""}</div></td></tr>`).join("");
+    <td class="mono" data-label="标识 / 名称">${d.slug}<div class="muted">${d.name || ""}</div><div class="muted">第${d.level || 1}级${d.parent ? " · 上级 " + d.parent : " · 总后台直开"} · 下级 ${d.children || 0}/3</div></td></tr>`).join("");
   applyFilter("qDists", "distBody");
 }
 async function distAct(slug, action) {

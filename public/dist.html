@@ -109,6 +109,25 @@
       </table>
     </div>
 
+    <h2>我发展的分销商</h2>
+    <div class="card">
+      <div class="row">
+        <input id="ssub" placeholder="登录标识，如 abc" style="width:150px" class="mono">
+        <input id="sname" placeholder="分销商名称" style="width:150px">
+        <input id="spw" placeholder="密码（可留空，他自己设）" style="width:190px">
+        <input id="squota" type="number" placeholder="额度（个数）" style="width:120px" value="100">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button id="subCreateBtn">添加分销商</button>
+        <span id="subMsg" class="muted"></span>
+      </div>
+      <div class="muted" style="margin:8px 0" id="subHint">五级三进制：每个分销商最多发展 3 个下级，一共 5 级（1 变 3、3 变 9、9 变 27、27 变 81）。开下级不扣你的发码额度；他的额度由你定，他只能管他自己发展的下级和客户。</div>
+      <table>
+        <thead><tr><th>登录地址</th><th>额度</th><th>状态</th><th>操作</th><th>标识 / 名称</th></tr></thead>
+        <tbody id="subBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
+      </table>
+    </div>
+
     <h2>游客客户（小火箭等第三方客户端）</h2>
     <div class="card">
       <div class="row">
@@ -177,6 +196,7 @@ async function loadMe() {
     $("console").classList.remove("hidden");
     loadDevices();
     loadGuests();
+    loadSubs();
   }
 }
 async function doLogin() {
@@ -248,6 +268,73 @@ async function loadDevices() {
   applyFilter("qMyDevices", "tbody");
 }
 $("refreshBtn").onclick = loadDevices;
+
+async function loadSubs() {
+  const { data } = await api("/api/dist/dist");
+  if (!data.ok) { $("subBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
+  const left = data.max_children - data.distributors.length;
+  $("subHint").textContent = data.level >= data.max_level
+    ? `你已经是第 ${data.level} 级（共 ${data.max_level} 级），不能再发展下级了。五级三进制：每个分销商最多 3 个下级。`
+    : `你是第 ${data.level} 级，还可以发展 ${left} 个下级分销商（最多 ${data.max_children} 个，共 ${data.max_level} 级）。开下级不扣你的发码额度；他的额度由你定。`;
+  $("subCreateBtn").disabled = !data.can_create;
+  if (!data.distributors.length) {
+    $("subBody").innerHTML = '<tr><td colspan="5" class="muted">还没有下级分销商</td></tr>';
+    return;
+  }
+  $("subBody").innerHTML = data.distributors.map((d) => `<tr>
+    <td class="mono" data-label="登录地址">${location.origin}/${d.slug}</td>
+    <td data-label="额度">${d.used} / ${d.quota < 0 ? "不限" : d.quota}<div class="muted">客户 ${d.users.devices} 台${d.users.pending ? "（待激活 " + d.users.pending + "）" : ""} · 游客 ${d.users.guests} 个 · 下级 ${d.children}/${data.max_children}</div></td>
+    <td data-label="状态">${!d.has_pw ? "待他设密码" : (d.status === "active" ? "正常" : "已停用")}</td>
+    <td class="acts">${d.status === "active"
+      ? `<button class="small danger" onclick="subAct('${d.slug}','disable')">停用</button>`
+      : `<button class="small ghost" onclick="subAct('${d.slug}','enable')">恢复</button>
+         <button class="small danger" onclick="subAct('${d.slug}','delete')">删除账户</button>`}
+      <button class="small ghost" onclick="subAct('${d.slug}','resetpw')">重置密码</button>
+      <button class="small ghost" onclick="subAct('${d.slug}','rename')">改名</button>
+      <button class="small ghost" onclick="subAct('${d.slug}','reslug')">标识</button>
+      <button class="small ghost" onclick="subAct('${d.slug}','quota')">改额度</button></td>
+    <td class="mono" data-label="标识 / 名称">${d.slug}<div class="muted">${d.name || ""}</div></td></tr>`).join("");
+}
+async function subAct(slug, action) {
+  const body = { slug, action };
+  if (action === "resetpw" && !confirm(`重置 ${slug} 的密码？他下次打开链接时要重新设置密码。`)) return;
+  if (action === "delete" && !confirm(`彻底删除分销商 ${slug}？删除后他的链接立即失效、不可恢复（他已发出的客户不受影响；有下级的不能删）。`)) return;
+  if (action === "quota") {
+    const q = prompt(`分销商 ${slug} 的总额度（个数，-1 = 不限）：`);
+    if (q === null || q === "") return;
+    body.quota = Number(q);
+  }
+  if (action === "rename") {
+    const n = prompt(`分销商 ${slug} 的新名称（用户名）：`);
+    if (n === null || !n.trim()) return;
+    body.name = n.trim();
+  }
+  if (action === "reslug") {
+    const n = prompt(`把 ${slug} 的登录标识改成（小写字母/数字/-/_，2–24 位）：\n改完他的登录地址变成 ${location.origin}/新标识，旧地址立即失效；密码、额度、客户都不变。`);
+    if (n === null || !n.trim()) return;
+    body.new_slug = n.trim().toLowerCase();
+  }
+  const { data } = await api("/api/dist/dist", { method: "POST", body: JSON.stringify(body) });
+  if (!data.ok) alert("失败：" + (data.reason === "exists" ? "这个标识已被占用" : data.reason === "bad_slug" ? "标识格式不对" : data.reason === "has_children" ? "他还有下级分销商，不能删除" : data.reason === "disable_first" ? "先停用才能删除" : data.reason || ""));
+  loadSubs();
+}
+window.subAct = subAct;
+$("subCreateBtn").onclick = async () => {
+  const body = {
+    action: "create",
+    slug: $("ssub").value.trim().toLowerCase(),
+    name: $("sname").value.trim(),
+    password: $("spw").value,
+    quota: Number($("squota").value || 100),
+  };
+  if (!body.slug) { $("subMsg").textContent = "标识必填（密码可留空，他首次打开自己设）"; return; }
+  const { data } = await api("/api/dist/dist", { method: "POST", body: JSON.stringify(body) });
+  $("subMsg").textContent = data.ok
+    ? `已添加（第 ${data.level} 级）：他的登录地址 ${location.origin}/${body.slug}`
+    : "失败：" + (data.reason === "children_limit" ? "下级名额已满（最多 3 个）" : data.reason === "max_level" ? "已经是第 5 级，不能再发展下级" : data.reason === "exists" ? "这个标识已被占用" : data.reason === "bad_slug" ? "标识格式不对" : data.reason || "");
+  if (data.ok) loadSubs();
+};
+
 
 async function loadGuests() {
   const { data } = await api("/api/dist/guest");

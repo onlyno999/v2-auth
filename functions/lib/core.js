@@ -370,6 +370,59 @@ export async function putDist(env, slug, rec) {
   await bumpDataVersion(env);
   await env.V2.put("dist:" + slug, JSON.stringify(rec));
 }
+
+// Move a distributor to a new slug: the record (name, password,
+// quota, usage, status, tree position) is copied to the new key,
+// the old key dies, his licenses and guests are re-stamped, and
+// his sub-distributors' parent pointers follow. Returns nothing;
+// callers validate first (format, uniqueness, scope).
+export async function moveDistributor(env, oldSlug, newSlug, rec) {
+  await putDist(env, newSlug, { ...rec });
+  await env.V2.delete("dist:" + oldSlug);
+  for (const prefix of ["lic:", "gst:", "dist:"]) {
+    let cursor;
+    do {
+      const page = await env.V2.list({ prefix, limit: 200, cursor });
+      cursor = page.list_complete ? undefined : page.cursor;
+      for (const k of page.keys) {
+        if (prefix === "dist:" && k.name === "dist:" + newSlug) continue;
+        const raw = await env.V2.get(k.name);
+        if (!raw) continue;
+        const item = JSON.parse(raw);
+        if (prefix === "dist:") {
+          if (item.parent === oldSlug) {
+            item.parent = newSlug;
+            await env.V2.put(k.name, JSON.stringify(item));
+          }
+        } else if (item.dist === oldSlug) {
+          item.dist = newSlug;
+          await env.V2.put(k.name, JSON.stringify(item));
+        }
+      }
+    } while (cursor);
+  }
+}
+
+// Direct sub-distributors of a slug (the ternary tree: each
+// distributor may open at most 3, five levels deep).
+export async function listDistChildren(env, slug) {
+  const out = [];
+  let cursor;
+  do {
+    const page = await env.V2.list({ prefix: "dist:", limit: 200, cursor });
+    cursor = page.list_complete ? undefined : page.cursor;
+    for (const k of page.keys) {
+      const raw = await env.V2.get(k.name);
+      if (!raw) continue;
+      const rec = JSON.parse(raw);
+      if (rec.parent === slug) out.push({ slug: k.name.slice(5), rec });
+    }
+  } while (cursor);
+  return out;
+}
+export function distLevel(rec) {
+  return rec && Number.isFinite(rec.level) ? rec.level : 1;
+}
 export const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,23}$/;
 export const RESERVED_SLUGS = new Set(["api", "index", "dist", "admin", "assets", "guest", "s", "g"]);
 

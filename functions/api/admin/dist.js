@@ -1,6 +1,6 @@
 import {
   json, readJson, nowSec, isAdmin, sha256hex, getDist, putDist, SLUG_RE, RESERVED_SLUGS,
-  bumpDataVersion, cachedPayload,
+  bumpDataVersion, cachedPayload, moveDistributor, listDistChildren, distLevel,
 } from "../../lib/core.js";
 
 // GET -> all distributors. POST -> create / update / disable / enable.
@@ -45,8 +45,12 @@ export async function onRequestGet({ request, env }) {
       const slug = k.name.slice(5);
       rows.push({
         slug, ...rec, pw_hash: undefined, has_pw: !!rec.pw_hash,
+        level: distLevel(rec), parent: rec.parent || null,
         users: tally.get(slug) || { devices: 0, pending: 0, guests: 0 },
       });
+    }
+    for (const r of rows) {
+      r.children = rows.filter((x) => x.parent === r.slug).length;
     }
     return rows;
   });
@@ -75,6 +79,8 @@ export async function onRequestPost({ request, env }) {
       quota: Number.isFinite(body.quota) ? Math.floor(body.quota) : 100,
       used: 0,
       status: "active",
+      level: 1,
+      parent: null,
       created_at: nowSec(),
     });
     return json({ ok: true, slug });
@@ -115,24 +121,7 @@ export async function onRequestPost({ request, env }) {
       }
       if (next === slug) return json({ ok: true, slug });
       if (await getDist(env, next)) return json({ ok: false, reason: "exists" }, 409);
-      await putDist(env, next, { ...rec });
-      await env.V2.delete("dist:" + slug);
-      for (const prefix of ["lic:", "gst:"]) {
-        let cursor;
-        do {
-          const page = await env.V2.list({ prefix, limit: 200, cursor });
-          cursor = page.list_complete ? undefined : page.cursor;
-          for (const k of page.keys) {
-            const raw = await env.V2.get(k.name);
-            if (!raw) continue;
-            const item = JSON.parse(raw);
-            if (item.dist === slug) {
-              item.dist = next;
-              await env.V2.put(k.name, JSON.stringify(item));
-            }
-          }
-        } while (cursor);
-      }
+      await moveDistributor(env, slug, next, rec);
       return json({ ok: true, slug: next });
     }
     case "quota":
@@ -154,6 +143,9 @@ export async function onRequestPost({ request, env }) {
       // an active distributor). His already-issued customers keep
       // their licenses untouched; the /<slug> link dies immediately.
       if (rec.status !== "disabled") return json({ ok: false, reason: "disable_first" }, 400);
+      if ((await listDistChildren(env, slug)).length) {
+        return json({ ok: false, reason: "has_children" }, 400);
+      }
       await env.V2.delete("dist:" + slug);
       return json({ ok: true });
     default:
