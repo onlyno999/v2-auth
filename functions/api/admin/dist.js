@@ -73,14 +73,31 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, reason: "weak_password" }, 400);
     }
     if (await getDist(env, slug)) return json({ ok: false, reason: "exists" }, 409);
+    // Placement in the tree (owner, 2026-11-04): distributors do
+    // NOT open distributors themselves — the admin adds everyone
+    // manually, either directly under the console (level 1) or
+    // under an existing distributor's name, inside the ternary
+    // caps (at most 3 children each, five levels deep).
+    let level = 1, parent = null;
+    if (body.parent) {
+      const pSlug = String(body.parent).toLowerCase();
+      const pRec = await getDist(env, pSlug);
+      if (!pRec) return json({ ok: false, reason: "parent_not_found" }, 404);
+      if (distLevel(pRec) >= 5) return json({ ok: false, reason: "max_level" }, 400);
+      if ((await listDistChildren(env, pSlug)).length >= 3) {
+        return json({ ok: false, reason: "children_limit" }, 400);
+      }
+      level = distLevel(pRec) + 1;
+      parent = pSlug;
+    }
     await putDist(env, slug, {
       name: body.name || slug,
       pw_hash: body.password ? await sha256hex(String(body.password)) : null,
       quota: Number.isFinite(body.quota) ? Math.floor(body.quota) : 100,
       used: 0,
       status: "active",
-      level: 1,
-      parent: null,
+      level,
+      parent,
       created_at: nowSec(),
     });
     return json({ ok: true, slug });

@@ -62,7 +62,7 @@ export async function onRequestGet({ request, env }) {
     level: distLevel(me),
     max_children: MAX_CHILDREN,
     max_level: MAX_LEVEL,
-    can_create: distLevel(me) < MAX_LEVEL && kids.length < MAX_CHILDREN,
+    can_create: false,
     distributors: out,
   });
 }
@@ -76,29 +76,10 @@ export async function onRequestPost({ request, env }) {
   const body = await readJson(request);
 
   if (body.action === "create") {
-    const child = (body.slug || "").toLowerCase();
-    if (!SLUG_RE.test(child) || RESERVED_SLUGS.has(child)) {
-      return json({ ok: false, reason: "bad_slug" }, 400);
-    }
-    if (body.password && String(body.password).length < 6) {
-      return json({ ok: false, reason: "weak_password" }, 400);
-    }
-    if (distLevel(me) >= MAX_LEVEL) return json({ ok: false, reason: "max_level" }, 400);
-    if ((await listDistChildren(env, slug)).length >= MAX_CHILDREN) {
-      return json({ ok: false, reason: "children_limit" }, 400);
-    }
-    if (await getDist(env, child)) return json({ ok: false, reason: "exists" }, 409);
-    await putDist(env, child, {
-      name: body.name || child,
-      pw_hash: body.password ? await sha256hex(String(body.password)) : null,
-      quota: Number.isFinite(body.quota) ? Math.floor(body.quota) : 100,
-      used: 0,
-      status: "active",
-      level: distLevel(me) + 1,
-      parent: slug,
-      created_at: nowSec(),
-    });
-    return json({ ok: true, slug: child, level: distLevel(me) + 1 });
+    // Owner (2026-11-04): distributors never open distributors —
+    // every distributor is added manually by the admin console,
+    // under whoever's name it belongs. This console only MANAGES.
+    return json({ ok: false, reason: "admin_only" }, 403);
   }
 
   // Every other action targets one of MY sub-distributors.

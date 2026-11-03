@@ -424,6 +424,11 @@ $("refreshBtn").onclick = loadDevices;
 async function loadDists() {
   const { data } = await api("/api/admin/dist");
   if (!data.ok) { $("distBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
+  const curParent = $("dparent").value;
+  $("dparent").innerHTML = '<option value="">上级：总后台直属（第1级）</option>' + data.distributors
+    .filter((x) => (x.level || 1) < 5)
+    .map((x) => `<option value="${x.slug}">上级：${x.name || x.slug}（${x.slug} · 第${x.level || 1}级 · 下级 ${x.children || 0}/3）</option>`).join("");
+  $("dparent").value = [...$("dparent").options].some((o) => o.value === curParent) ? curParent : "";
   if (!data.distributors.length) {
     $("distBody").innerHTML = '<tr><td colspan="5" class="muted">还没有分销商</td></tr>';
     return;
@@ -476,12 +481,13 @@ $("distCreateBtn").onclick = async () => {
     name: $("dname").value.trim(),
     password: $("dpw").value,
     quota: Number($("dquota").value || 100),
+    parent: $("dparent").value || undefined,
   };
   if (!body.slug) { $("distMsg").textContent = "标识必填（密码可留空，他首次打开自己设）"; return; }
   const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify(body) });
   $("distMsg").textContent = data.ok
     ? `已添加：他的登录地址 ${location.origin}/${body.slug}`
-    : "失败：" + (data.reason || "");
+    : "失败：" + (data.reason === "children_limit" ? "这个上级名下已有 3 个下级，满了" : data.reason === "max_level" ? "上级已是第 5 级，不能再往下加" : data.reason === "parent_not_found" ? "上级分销商不存在" : data.reason === "exists" ? "这个标识已被占用" : data.reason || "");
   if (data.ok) loadDists();
 };
 
