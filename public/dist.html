@@ -87,8 +87,16 @@
 const $ = (id) => document.getElementById(id);
 const slug = location.pathname.replace(/\//g, "");
 const api = async (path, opts = {}) => {
-  const r = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
-  return { status: r.status, data: await r.json().catch(() => ({})) };
+  const tries = !opts.method || opts.method === "GET" ? 3 : 1;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(path, { headers: { "content-type": "application/json" }, ...opts });
+      return { status: r.status, data: await r.json().catch(() => ({})) };
+    } catch (e) {
+      if (i === tries - 1) return { status: 0, data: { ok: false, reason: "network" } };
+      await new Promise((res) => setTimeout(res, 700));
+    }
+  }
 };
 const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString("zh-CN", { hour12: false }) : "—";
 
