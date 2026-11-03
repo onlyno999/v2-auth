@@ -169,6 +169,20 @@ const ext = await j("/api/admin/action", { machineCode: M1, action: "extend", da
 const valExpired = await signedCall("/api/validate", M1, dev1.kp);
 check("expired license locked out", ext.status === 200 && valExpired.status === 403 && JSON.parse(valExpired.text).reason === "expired");
 
+// manual expiry edit （修改时间）: absolute moment, past moment, permanent
+const nowS = Math.floor(Date.now() / 1000);
+const setFuture = await j("/api/admin/action", { machineCode: M1, action: "set_expiry", expires_at: nowS + 3600 }, { cookie });
+const valEdited = await signedCall("/api/validate", M1, dev1.kp);
+check("set_expiry to future revives device", setFuture.status === 200 && setFuture.data.expires_at === nowS + 3600 && valEdited.status === 200);
+const setPast = await j("/api/admin/action", { machineCode: M1, action: "set_expiry", expires_at: nowS - 10 }, { cookie });
+const valPast = await signedCall("/api/validate", M1, dev1.kp);
+check("set_expiry to past expires device", setPast.status === 200 && valPast.status === 403 && JSON.parse(valPast.text).reason === "expired");
+const setBad = await j("/api/admin/action", { machineCode: M1, action: "set_expiry", expires_at: "abc" }, { cookie });
+check("set_expiry rejects garbage", setBad.status === 400);
+const setPerm = await j("/api/admin/action", { machineCode: M1, action: "set_expiry", expires_at: null }, { cookie });
+const valPerm = await signedCall("/api/validate", M1, dev1.kp);
+check("set_expiry null makes permanent", setPerm.status === 200 && setPerm.data.expires_at === null && valPerm.status === 200);
+
 const devList = await fetch(BASE + "/api/admin/devices", { headers: { cookie } }).then((r) => r.json());
 check("device table lists devices", devList.ok && devList.devices.length >= 2, `${devList.devices?.length} devices`);
 const noAuthList = await fetch(BASE + "/api/admin/devices").then((r) => r.status);

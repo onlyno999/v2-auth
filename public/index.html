@@ -226,6 +226,34 @@ async function act(machine, action, days) {
 }
 window.act = act;
 
+// Manual expiry edit: type the exact moment the license should end
+// (local time), or 0 / 永久 to make it permanent. A past moment is
+// allowed and expires the license immediately.
+const pad2 = (n) => String(n).padStart(2, "0");
+function localTimeText(ts) {
+  const d = new Date(ts * 1000);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+async function editExpiry(machine, expiresAt) {
+  const v = prompt(
+    `修改到期时间（当前：${expiresAt ? fmt(expiresAt) : "永久"}）\n按这个格式填：2026-12-03 23:13\n填 0 或“永久” = 改成永久`,
+    expiresAt ? localTimeText(expiresAt) : "");
+  if (v === null || v.trim() === "") return;
+  const t = v.trim();
+  let exp = null;
+  if (!(t === "0" || t === "永久" || t.toLowerCase() === "permanent")) {
+    const m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) { alert("格式不对，按 2026-12-03 23:13 这样填"); return; }
+    const dt = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+    if (isNaN(dt.getTime())) { alert("这个时间不对，检查一下"); return; }
+    exp = Math.floor(dt.getTime() / 1000);
+  }
+  const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action: "set_expiry", expires_at: exp }) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  loadDevices();
+}
+window.editExpiry = editExpiry;
+
 function renderIssued(list) {
   if (!list.length) {
     $("issuedBody").innerHTML = '<tr><td colspan="6" class="muted">还没有发出过码</td></tr>';
@@ -283,7 +311,7 @@ async function loadDevices() {
           ? `<button class="small ghost" onclick="act('${d.machine}','restore')">恢复</button>`
           : `<button class="small danger" onclick="act('${d.machine}','revoke')">停用</button>`}
         <button class="small ghost" onclick="act('${d.machine}','unbind')">解绑</button>
-        <button class="small ghost" onclick="act('${d.machine}','extend',30)">+30天</button>
+        <button class="small ghost" onclick="editExpiry('${d.machine}', ${lic.expires_at || 0})">修改时间</button>
         <button class="small danger" onclick="act('${d.machine}','delete')">删除</button>
       </td></tr>`;
   }).join("");

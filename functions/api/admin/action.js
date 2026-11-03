@@ -2,7 +2,9 @@ import {
   json, readJson, nowSec, isAdmin, getDev, getLicByKey, putLic, logEvent, parseDeltaSec,
 } from "../../lib/core.js";
 
-// POST {machineCode, action: revoke|restore|unbind|extend, days?}  (admin)
+// POST {machineCode, action: revoke|restore|unbind|extend|set_expiry,
+//       days?, expires_at?}  (admin). set_expiry writes an absolute
+// expiry (epoch seconds), or null for permanent.
 // Or {licKey, action: revoke} to kill an issued-but-unused code.
 export async function onRequestPost({ request, env }) {
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
@@ -66,6 +68,27 @@ export async function onRequestPost({ request, env }) {
       const expires_at = lic.expires_at + deltaSec;
       await putLic(env, { ...lic, expires_at });
       await logEvent(env, "admin_extend", machine, `${deltaSec}s`);
+      return json({ ok: true, expires_at, now: nowSec() });
+    }
+    case "set_expiry": {
+      // Manual edit of the expiry moment itself (the console's
+      // 修改时间 button): an absolute epoch-second deadline, or null
+      // to make the license permanent. A past moment is allowed —
+      // it simply expires the license immediately.
+      if (!lic) return json({ ok: false, reason: "not_found" }, 404);
+      if (!("expires_at" in body)) return json({ ok: false, reason: "bad_expiry" }, 400);
+      if (body.expires_at === null) {
+        await putLic(env, { ...lic, expires_at: null, days: 0, duration_sec: null });
+        await logEvent(env, "admin_set_expiry", machine, "permanent");
+        return json({ ok: true, expires_at: null, now: nowSec() });
+      }
+      const expires_at = Number(body.expires_at);
+      if (!Number.isFinite(expires_at) || Math.floor(expires_at) !== expires_at || expires_at <= 0) {
+        return json({ ok: false, reason: "bad_expiry" }, 400);
+      }
+      const days = Math.max(0, Math.ceil((expires_at - nowSec()) / 86400));
+      await putLic(env, { ...lic, expires_at, days });
+      await logEvent(env, "admin_set_expiry", machine, String(expires_at));
       return json({ ok: true, expires_at, now: nowSec() });
     }
     default:
