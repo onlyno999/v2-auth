@@ -102,6 +102,7 @@
 
     <h2>我的客户 <button id="refreshBtn" class="ghost small">刷新</button></h2>
     <div class="card">
+      <div class="row" style="margin-bottom:8px"><input id="qMyDevices" placeholder="搜索：机器码 / 备注" oninput="applyFilter('qMyDevices','tbody')" style="flex:1"></div>
       <table>
         <thead><tr><th>机器码 / 备注</th><th>激活</th><th>到期</th><th>最近打开</th><th>状态</th></tr></thead>
         <tbody id="tbody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
@@ -125,6 +126,7 @@
         <span id="guestMsg" class="muted"></span>
       </div>
       <div class="muted" style="margin:8px 0">添加后把「专属页面」链接发给客户：他打开先输密码，进去只能看到自己还剩多少时间、复制他自己的订阅链接，真实订阅地址不显示。添加游客占 1 个额度；最长 365 天。停用 / 到期后他的订阅链接立刻失效；删除要先停用。</div>
+      <div class="row" style="margin-bottom:8px"><input id="qMyGuests" placeholder="搜索：用户名 / 备注" oninput="applyFilter('qMyGuests','guestBody')" style="flex:1"></div>
       <table>
         <thead><tr><th>用户名 / 备注</th><th>专属页面</th><th>到期</th><th>状态</th><th>操作</th></tr></thead>
         <tbody id="guestBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
@@ -243,6 +245,7 @@ async function loadDevices() {
     <td data-label="到期">${d.lic.expires_at ? fmt(d.lic.expires_at) : "—"}</td>
     <td data-label="最近打开">${fmt(d.last_seen)}</td>
     <td data-label="状态">${d.lic.status}</td></tr>`).join("");
+  applyFilter("qMyDevices", "tbody");
 }
 $("refreshBtn").onclick = loadDevices;
 
@@ -270,6 +273,7 @@ async function loadGuests() {
       <button class="small ghost" onclick="guestLimit('${g.id}')">拉取上限</button>
       <button class="small ghost" onclick="guestAct('${g.id}','password')">改密码</button></td></tr>`;
   }).join("");
+  applyFilter("qMyGuests", "guestBody");
 }
 async function copyGuestPage(page) {
   try { await navigator.clipboard.writeText(page); alert("已复制专属页面链接：" + page); }
@@ -277,6 +281,39 @@ async function copyGuestPage(page) {
 }
 window.copyGuestPage = copyGuestPage;
 const guestLimitMap = {};
+// Client-side table search (owner, 2026-11-04: the lists will
+// grow — every table gets a search box). Purely visual: rows are
+// hidden, never removed, and each loader re-applies its filter
+// after rendering, so actions and reloads keep working exactly
+// as before. Matching is against the row's visible text — machine
+// code, customer name, slug, status words all hit.
+function applyFilter(inputId, bodyId) {
+  const input = $(inputId);
+  const body = $(bodyId);
+  if (!input || !body) return;
+  const q = (input.value || "").trim().toLowerCase();
+  const rows = [...body.querySelectorAll("tr")];
+  const real = rows.filter((tr) => !tr.querySelector("td[colspan]") && !tr.classList.contains("nomatch"));
+  let nm = body.querySelector("tr.nomatch");
+  if (!real.length) { if (nm) nm.remove(); return; }
+  let visible = 0;
+  for (const tr of real) {
+    const hit = !q || tr.textContent.toLowerCase().includes(q);
+    tr.style.display = hit ? "" : "none";
+    if (hit) visible++;
+  }
+  if (q && visible === 0) {
+    if (!nm) {
+      nm = document.createElement("tr");
+      nm.className = "nomatch";
+      nm.innerHTML = '<td colspan="9" class="muted">没有匹配的结果</td>';
+      body.appendChild(nm);
+    }
+    nm.style.display = "";
+  } else if (nm) nm.remove();
+}
+window.applyFilter = applyFilter;
+
 async function guestLimit(id) {
   const cur = guestLimitMap[id];
   const v = prompt(`每日拉取上限（当前：${cur === 0 ? "不限（上级设置）" : (cur ?? 10) + " 次"}）\n填 1 到 10 次，留空 = 默认 10 次（分销不能设置不限）`, cur === 0 ? "" : String(cur ?? 10));
