@@ -120,7 +120,7 @@
           <option value="day" selected>天</option>
         </select>
         <input id="gnote" placeholder="备注（可空）" style="width:130px">
-        <input id="glimit" type="number" min="0" max="999" placeholder="每日拉取上限（默认10，0=不限）" style="width:220px">
+        <input id="glimit" type="number" min="1" max="10" placeholder="每日拉取上限（默认10，最多10）" style="width:220px">
         <button id="guestCreateBtn">添加游客</button>
         <span id="guestMsg" class="muted"></span>
       </div>
@@ -222,7 +222,7 @@ $("issueBtn").onclick = async () => {
     $("codeOut").classList.remove("hidden");
     $("issueMsg").textContent = "";
     loadMe();
-  } else $("issueMsg").textContent = "失败：" + (data.reason === "quota_exhausted" ? "额度用完了，联系上级补充" : data.reason || "");
+  } else $("issueMsg").textContent = "失败：" + (data.reason === "quota_exhausted" ? "额度用完了，联系上级补充" : data.reason === "limit_range" ? "每日拉取上限只能设 1 到 10 次" : data.reason || "");
 };
 $("openBtn").onclick = async () => {
   const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), mode: "open" };
@@ -279,13 +279,13 @@ window.copyGuestPage = copyGuestPage;
 const guestLimitMap = {};
 async function guestLimit(id) {
   const cur = guestLimitMap[id];
-  const v = prompt(`每日拉取上限（当前：${cur === 0 ? "不限" : (cur ?? 10) + " 次"}）\n填次数（0 = 不限），留空 = 恢复默认 10 次`, cur === 0 ? "0" : String(cur ?? 10));
+  const v = prompt(`每日拉取上限（当前：${cur === 0 ? "不限（上级设置）" : (cur ?? 10) + " 次"}）\n填 1 到 10 次，留空 = 默认 10 次（分销不能设置不限）`, cur === 0 ? "" : String(cur ?? 10));
   if (v === null) return;
   const t = v.trim();
   const body = { id, action: "set_limit", daily_limit: t === "" ? null : Number(t) };
-  if (t !== "" && (!Number.isInteger(body.daily_limit) || body.daily_limit < 0 || body.daily_limit > 999)) { alert("填 0 到 999 的整数"); return; }
+  if (t !== "" && (!Number.isInteger(body.daily_limit) || body.daily_limit < 1 || body.daily_limit > 10)) { alert("填 1 到 10 的整数"); return; }
   const { data } = await api("/api/dist/guest", { method: "POST", body: JSON.stringify(body) });
-  if (!data.ok) alert("失败：" + (data.reason || ""));
+  if (!data.ok) alert("失败：" + (data.reason === "limit_range" ? "每日拉取上限只能设 1 到 10 次" : data.reason || ""));
   loadGuests();
 }
 window.guestLimit = guestLimit;
@@ -338,7 +338,7 @@ $("guestCreateBtn").onclick = async () => {
   const { data } = await api("/api/dist/guest", { method: "POST", body: JSON.stringify(body) });
   $("guestMsg").textContent = data.ok
     ? `已添加：把 ${location.origin}${data.path} 发给客户`
-    : "失败：" + (data.reason === "exists" ? "用户名已存在" : data.reason === "quota_exhausted" ? "额度用完了，联系上级补充" : data.reason || "");
+    : "失败：" + (data.reason === "exists" ? "用户名已存在" : data.reason === "quota_exhausted" ? "额度用完了，联系上级补充" : data.reason === "limit_range" ? "每日拉取上限只能设 1 到 10 次" : data.reason || "");
   if (data.ok) { loadGuests(); loadMe(); }
 };
 (async () => {

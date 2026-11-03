@@ -61,6 +61,11 @@ export async function onRequestPost({ request, env }) {
     }
     const lim = guestLimitInput(body.daily_limit);
     if (!lim.ok) return json({ ok: false, reason: "bad_limit" }, 400);
+    // Distributor ceiling (owner's rule): his guests cap at 10/day —
+    // no unlimited, nothing above 10. (The admin is not bound by it.)
+    if (lim.set && lim.value !== null && (lim.value < 1 || lim.value > 10)) {
+      return json({ ok: false, reason: "limit_range" }, 400);
+    }
     const sec = parseDurationSec(body);
     if (sec === null || sec === undefined) return json({ ok: false, reason: "bad_duration" }, 400);
     if (sec === 0) return json({ ok: false, reason: "no_permanent" }, 400);
@@ -113,10 +118,13 @@ export async function onRequestPost({ request, env }) {
       await putGuest(env, id, { ...rec, status: "active", ...guestFetchReset() });
       return json({ ok: true });
     case "set_limit": {
-      // Per-guest daily fetch cap: a number 0..999 (0 = unlimited),
-      // or null to fall back to the global default (10/day).
+      // Per-guest daily fetch cap. Distributor ceiling: 1..10 only —
+      // no unlimited (the admin can still grant more from his side).
       const lim = guestLimitInput(body.daily_limit);
       if (!lim.ok || !lim.set) return json({ ok: false, reason: "bad_limit" }, 400);
+      if (lim.value !== null && (lim.value < 1 || lim.value > 10)) {
+        return json({ ok: false, reason: "limit_range" }, 400);
+      }
       const next = { ...rec };
       if (lim.value === null) delete next.daily_limit;
       else next.daily_limit = lim.value;
