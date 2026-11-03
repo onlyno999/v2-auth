@@ -240,5 +240,49 @@ check("device deleted from table", delDev.status === 200 && !(afterDel.devices |
 const valAfterDel = await j("/api/validate", { machineCode: M1, token: act1.data.token });
 check("validate denied after device delete", valAfterDel.status === 403);
 
+// ---- legacy offline-code conversion (fixture key; skipped if absent) ----
+import { readFileSync } from "node:fs";
+let legacyFx = null;
+try { legacyFx = JSON.parse(readFileSync(new URL("./fixtures/legacy_test_key.json", import.meta.url), "utf8")); } catch {}
+if (legacyFx) {
+  const B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+  const b32enc = (bytes) => {
+    let s = "", buf = 0, bits = 0;
+    for (const b of bytes) { buf = (buf << 8) | b; bits += 8; while (bits >= 5) { bits -= 5; s += B32[(buf >> bits) & 31]; } }
+    if (bits > 0) s += B32[(buf << (5 - bits)) & 31];
+    return s;
+  };
+  const group = (s) => s.match(/.{1,4}/g).join("-");
+  const priv = await crypto.subtle.importKey("jwk", legacyFx.jwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+  const devL = await newDeviceKey();
+  async function makeLegacyCode(machineHash, expiryMinutes) {
+    const payload = new Uint8Array(63);
+    payload[0] = 0x03;
+    payload[1] = (expiryMinutes >>> 24) & 0xff; payload[2] = (expiryMinutes >>> 16) & 0xff;
+    payload[3] = (expiryMinutes >>> 8) & 0xff; payload[4] = expiryMinutes & 0xff;
+    payload.set(machineHash, 5);
+    crypto.getRandomValues(payload.subarray(15));
+    const sig = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, priv, payload));
+    const blob = new Uint8Array(127); blob.set(payload); blob.set(sig, 63);
+    return group(b32enc(blob));
+  }
+  const hashL = new Uint8Array(10); crypto.getRandomValues(hashL);
+  const machineL = group(b32enc(hashL));
+  const futureMin = Math.floor(Date.now() / 60000) + 60 * 24 * 30;
+  const legacyCode = await makeLegacyCode(hashL, futureMin);
+  const conv = await j("/api/legacy", { machineCode: machineL, code: legacyCode, pubkey: devL.pubkey, platform: "android-test" });
+  check("legacy code converts + token issued", conv.status === 200 && !!conv.data.token, JSON.stringify(conv.data).slice(0, 80));
+  const valL = await j("/api/validate", { machineCode: machineL, token: conv.data.token });
+  check("converted device validates", valL.status === 200 && valL.data.ok === true);
+  const convWrongMachine = await j("/api/legacy", { machineCode: M2, code: legacyCode, pubkey: devL.pubkey });
+  check("legacy code bound to its machine", convWrongMachine.status === 403 && convWrongMachine.data.reason === "bound_other");
+  const expiredCode = await makeLegacyCode(hashL, Math.floor(Date.now() / 60000) - 60);
+  const convExpired = await j("/api/legacy", { machineCode: machineL, code: expiredCode, pubkey: devL.pubkey });
+  check("expired legacy code refused", convExpired.status === 403 && convExpired.data.reason === "expired");
+  const tampered = legacyCode.slice(0, -2) + (legacyCode.endsWith("A") ? "B" : "A") + legacyCode.slice(-1);
+  const convBad = await j("/api/legacy", { machineCode: machineL, code: tampered, pubkey: devL.pubkey });
+  check("tampered legacy code refused", convBad.status === 403);
+}
+
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);
 process.exit(fail ? 1 : 0);
