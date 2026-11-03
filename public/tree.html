@@ -67,6 +67,7 @@
     <table><thead><tr><th>机器码 / 备注</th><th>激活</th><th>到期</th><th>状态</th><th>操作</th></tr></thead><tbody id="devBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody></table>
     <h3>游客</h3>
     <table><thead><tr><th>用户名</th><th>到期</th><th>状态</th><th>操作</th></tr></thead><tbody id="guestBody"><tr><td colspan="4" class="muted">加载中…</td></tr></tbody></table>
+    <div id="statsBox" style="margin-top:14px"></div>
     <h3>下级分销商</h3>
     <table><thead><tr><th>标识 / 名称</th><th>名下</th><th>状态</th><th>操作</th></tr></thead><tbody id="subBody"><tr><td colspan="4" class="muted">加载中…</td></tr></tbody></table>
   </div>
@@ -137,6 +138,20 @@ async function load() {
       ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>`
       : `<button class="small danger" onclick="guestAct('${g.id}','disable')">停用线路</button>`}</td>` : ""}
   </tr>`).join("") : `<tr><td colspan="${ACT ? 4 : 3}" class="muted">没有直属游客</td></tr>`;
+  const lvNames = { 1: "一级", 2: "二级", 3: "三级", 4: "四级", 5: "五级" };
+  const censusTxt = Object.keys(data.stats.census).sort().map((lv) => `${lvNames[lv] || lv + "级"} ${data.stats.census[lv]} 人`).join(" · ") || "没有下级分销商";
+  const dayRows = data.stats.daily.length ? data.stats.daily.map((d) => `<tr>
+      <td data-label="日期">${d.day}</td><td data-label="开通会员">${d.count} 个</td>
+      <td data-label="折算月数">${d.units} 个月</td><td data-label="金额">¥${d.money}</td></tr>`).join("")
+    : '<tr><td colspan="4" class="muted">近 30 天没有开通记录</td></tr>';
+  $("statsBox").innerHTML = `
+    <h3>名下分销商（按级汇总）</h3>
+    <div style="margin-bottom:10px">${censusTxt} · 合计 ${data.totals.subs} 人</div>
+    <h3>每日开通统计（近 30 天有记录的日子）</h3>
+    <table><thead><tr><th>日期</th><th>开通会员</th><th>折算月数</th><th>金额</th></tr></thead><tbody>${dayRows}</tbody></table>
+    <div style="margin-top:8px">本月合计：开通 ${data.stats.month.count} 个 · ${data.stats.month.units} 个月 · <b>¥${data.stats.month.money}</b></div>
+    <div>累计合计：开通 ${data.stats.total.count} 个 · ${data.stats.total.units} 个月 · <b>¥${data.stats.total.money}</b></div>
+    <div class="muted" style="margin-top:4px">金额按 ${data.stats.ref_price} 元/月参考价折算（年卡按 12 个月计）；他实际卖多少钱是他自己的事，这里只做统计。</div>`;
   $("subBody").innerHTML = data.subs.length ? data.subs.map((x) => `<tr>
     <td class="mono" data-label="分销商">${x.slug}<div class="muted">${x.name || ""} · 第${x.level}级</div></td>
     <td data-label="名下">客户 ${x.devices} 台${x.pending ? "（待激活 " + x.pending + "）" : ""} · 游客 ${x.guests} 个 · 下级 ${x.children} 个</td>

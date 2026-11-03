@@ -1,4 +1,4 @@
-import { getDist, listDistChildren, distLevel, cachedPayload } from "./core.js";
+import { getDist, listDistChildren, distLevel, cachedPayload, quotaCostFor, nowSec, beijingDay } from "./core.js";
 
 // Shared subtree builder for the two 名下 pages (admin tree.html
 // and distributor subtree.html): one distributor's direct people
@@ -51,16 +51,53 @@ export async function buildTree(env, slug) {
       (l) => l.rec.dist === s && (l.rec.status === "issued" || l.rec.status === "open"),
     ).length;
     const totals = { devices: 0, guests: 0, subs: 0 };
+    const members = new Set();
+    const census = {}; // absolute level -> descendant count
     const walk = async (s, seen) => {
       if (seen.has(s)) return;
       seen.add(s);
+      members.add(s);
       totals.devices += devicesOf(s).length;
       totals.guests += guestsOf(s).length;
       const kids = await listDistChildren(env, s);
       totals.subs += kids.length;
-      for (const k of kids) await walk(k.slug, seen);
+      for (const k of kids) {
+        const lv = distLevel(k.rec);
+        census[lv] = (census[lv] || 0) + 1;
+        await walk(k.slug, seen);
+      }
     };
     await walk(slug, new Set());
+
+    // Opening statistics over the whole subtree (owner,
+    // 2026-11-04): how many memberships were opened per day,
+    // duration-weighted into month units, valued at the 10-yuan
+    // reference month price — what the seller actually charges
+    // his own customers is his business; the book runs at 10.
+    const REF_PRICE = 10;
+    const monthPrefix = beijingDay(nowSec()).slice(0, 7);
+    const cutoff = nowSec() - 30 * 86400;
+    const byDay = new Map();
+    const statsTotal = { count: 0, units: 0, money: 0 };
+    const statsMonth = { count: 0, units: 0, money: 0 };
+    const tallyOpen = (dist, createdAt, durationSec, fallbackDays) => {
+      if (!members.has(dist) || !createdAt) return;
+      const units = quotaCostFor(durationSec || (fallbackDays || 30) * 86400);
+      statsTotal.count++; statsTotal.units += units; statsTotal.money += units * REF_PRICE;
+      const day = beijingDay(createdAt);
+      if (day.startsWith(monthPrefix)) {
+        statsMonth.count++; statsMonth.units += units; statsMonth.money += units * REF_PRICE;
+      }
+      if (createdAt >= cutoff) {
+        const d = byDay.get(day) || { day, count: 0, units: 0, money: 0 };
+        d.count++; d.units += units; d.money += units * REF_PRICE;
+        byDay.set(day, d);
+      }
+    };
+    for (const l of lics) tallyOpen(l.rec.dist, l.rec.created_at, l.rec.duration_sec, l.rec.days);
+    for (const g of guests) tallyOpen(g.rec.dist, g.rec.created_at, g.rec.duration_sec, g.rec.days);
+    const daily = [...byDay.values()].sort((a, b) => (a.day < b.day ? 1 : -1));
+    const stats = { census, daily, month: statsMonth, total: statsTotal, ref_price: REF_PRICE };
     const kids = await listDistChildren(env, slug);
     const subs = [];
     for (const k of kids) {
@@ -89,6 +126,7 @@ export async function buildTree(env, slug) {
       guests: guestsOf(slug),
       pending: pendingOf(slug),
       totals,
+      stats,
     };
   });
 }
