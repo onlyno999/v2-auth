@@ -80,10 +80,26 @@ check("admin login", login.status === 200 && cookie.startsWith("sess="));
 const badLogin = await j("/api/admin/login", { password: "wrong" });
 check("admin bad password rejected", badLogin.status === 401);
 
-const M1 = "TESTMACH000000001", M2 = "TESTMACH000000002", M3 = "TESTMACH000000003";
+const M1 = "TEST-MACH-0000-0001", M2 = "TEST-MACH-0000-0002", M3 = "TEST-MACH-0000-0003";
 const issue1 = await j("/api/admin/issue", { machineCode: M1, days: 30, note: "测试客户甲", mode: "code" }, { cookie });
 check("issue code", issue1.status === 200 && /^V2O-/.test(issue1.data.code || ""), issue1.data.code);
 const issue2 = await j("/api/admin/issue", { machineCode: M2, days: 365, note: "", mode: "code" }, { cookie });
+
+// The production mix-up: an activation code pasted into the machine
+// field must be refused in both modes — never parked as a fake
+// machine that no device can claim.
+const codeAsMachine1 = await j("/api/admin/issue", { machineCode: issue1.data.code, days: 30, mode: "code" }, { cookie });
+check("activation code as machine rejected (code mode)", codeAsMachine1.status === 400 && codeAsMachine1.data.reason === "bad_machine");
+const codeAsMachine2 = await j("/api/admin/issue", { machineCode: issue1.data.code, days: 30, mode: "open" }, { cookie });
+check("activation code as machine rejected (open mode)", codeAsMachine2.status === 400 && codeAsMachine2.data.reason === "bad_machine");
+const garbageMachine = await j("/api/admin/issue", { machineCode: "HELLO-WORLD", days: 30, mode: "open" }, { cookie });
+check("garbage machine rejected", garbageMachine.status === 400 && garbageMachine.data.reason === "bad_machine");
+// lowercase / ungrouped input is normalized to the canonical code,
+// and the direct-open -> claim chain still works end to end.
+const lowerOpen = await j("/api/admin/issue", { machineCode: "testmach00000009", days: 30, mode: "open" }, { cookie });
+const devLow = await newDeviceKey();
+const claimLow = await j("/api/claim", { machineCode: "TEST-MACH-0000-0009", pubkey: devLow.pubkey });
+check("normalized machine open + claim works", lowerOpen.status === 200 && claimLow.status === 200 && !!claimLow.data.token);
 
 const dev1 = await newDeviceKey();
 const badActivate = await j("/api/activate", { machineCode: M1, code: "V2O-XXXXX-XXXXX-XXXXX-XXXXX", pubkey: dev1.pubkey });
@@ -124,7 +140,7 @@ const subDeny = await j("/api/subscription", { machineCode: M1, token: "bogus" }
 check("subscription denied without auth", subDeny.status === 403);
 
 // distributor channel: separate subscription URL (SUB_URL_DIST)
-const M4 = "TESTMACH000000004";
+const M4 = "TEST-MACH-0000-0004";
 const issueD = await j("/api/admin/issue", { machineCode: M4, days: 30, note: "分销客户", mode: "code", channel: "dist" }, { cookie });
 const dev4 = await newDeviceKey();
 const act4 = await j("/api/activate", { machineCode: M4, code: issueD.data.code, pubkey: dev4.pubkey });
@@ -188,9 +204,11 @@ const dcookie = (distLoginRes.headers.get("set-cookie") || "").split(";")[0];
 check("dist login ok", distLoginRes.status === 200 && dcookie.startsWith("dsess="));
 const dme = await fetch(BASE + "/api/dist/me", { headers: { cookie: dcookie } }).then((r) => r.json());
 check("dist me + quota", dme.ok === true && dme.remaining === 2);
-const M5 = "TESTMACH000000005", M6 = "TESTMACH000000006", M7 = "TESTMACH000000007";
+const M5 = "TEST-MACH-0000-0005", M6 = "TEST-MACH-0000-0006", M7 = "TEST-MACH-0000-0007";
 const dIssue1 = await j("/api/dist/issue", { machineCode: M5, days: 30, note: "王客户", mode: "code" }, { cookie: dcookie });
 check("dist issues code", dIssue1.status === 200 && /^V2O-/.test(dIssue1.data.code || ""));
+const dBadMachine = await j("/api/dist/issue", { machineCode: dIssue1.data.code, days: 30, mode: "code" }, { cookie: dcookie });
+check("dist: activation code as machine rejected", dBadMachine.status === 400 && dBadMachine.data.reason === "bad_machine");
 const dPerm = await j("/api/dist/issue", { machineCode: M6, days: 0, note: "" }, { cookie: dcookie });
 check("dist permanent rejected (max 1y rule)", dPerm.status === 400);
 const dev5 = await newDeviceKey();
@@ -299,7 +317,7 @@ const gDel = await j("/api/admin/guest", { id: GID, action: "delete" }, { cookie
 check("guest deleted, link + page gone", gDel.status === 200 && (await fetch(gMe.link)).status === 404 && (await fetch(BASE + "/g/" + GID)).status === 404);
 
 // ---- minute-level durations (admin licenses + guests) ----
-const MM1 = "TESTMACH000000101", MM2 = "TESTMACH000000102", MM3 = "TESTMACH000000103";
+const MM1 = "TEST-MACH-0000-0101", MM2 = "TEST-MACH-0000-0102", MM3 = "TEST-MACH-0000-0103";
 const minIssue = await j("/api/admin/issue", { machineCode: MM1, durationValue: 5, durationUnit: "minute", note: "五分钟客户", mode: "code" }, { cookie });
 check("issue 5-minute code", minIssue.status === 200 && /^V2O-/.test(minIssue.data.code || ""));
 const devM1 = await newDeviceKey();

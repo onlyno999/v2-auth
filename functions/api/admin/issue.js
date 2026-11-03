@@ -1,6 +1,6 @@
 import {
   json, readJson, nowSec, isAdmin, newLicenseCode, codeKey, logEvent, vaultSeal,
-  parseDurationSec, durationSeconds, fmtDuration,
+  parseDurationSec, durationSeconds, fmtDuration, normalizeMachineCode,
 } from "../../lib/core.js";
 
 // POST {machineCode, days | durationValue+durationUnit, note,
@@ -12,7 +12,12 @@ import {
 export async function onRequestPost({ request, env }) {
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);
-  if (!body.machineCode) return json({ ok: false, reason: "no_machine" }, 400);
+  // The machine field must hold a machine code — never an activation
+  // code. Normalize (case/spacing) and validate the 4-4-4-4 format;
+  // anything else (above all V2O-…) is refused instead of being
+  // parked where no device can ever claim it.
+  const machine = normalizeMachineCode(body.machineCode);
+  if (!machine) return json({ ok: false, reason: "bad_machine" }, 400);
   let sec = parseDurationSec(body);
   if (sec === null) return json({ ok: false, reason: "bad_duration" }, 400);
   if (sec === undefined) sec = 30 * 86400;
@@ -25,7 +30,7 @@ export async function onRequestPost({ request, env }) {
     days: sec ? Math.ceil(sec / 86400) : 0,
     duration_sec: sec || null,
     status: mode === "open" ? "open" : "issued",
-    machine: body.machineCode,
+    machine,
     note: body.note || "",
     channel: body.channel === "dist" ? "dist" : "main",
     code_enc: mode === "code" ? await vaultSeal(env, code) : null,
@@ -35,10 +40,10 @@ export async function onRequestPost({ request, env }) {
   };
   await env.V2.put(key, JSON.stringify(rec));
   if (mode === "open") {
-    await env.V2.put("open:" + body.machineCode, key);
-    await logEvent(env, "admin_open", body.machineCode, fmtDuration(durationSeconds(rec)));
+    await env.V2.put("open:" + machine, key);
+    await logEvent(env, "admin_open", machine, fmtDuration(durationSeconds(rec)));
     return json({ ok: true, mode });
   }
-  await logEvent(env, "admin_issue", body.machineCode, fmtDuration(durationSeconds(rec)));
+  await logEvent(env, "admin_issue", machine, fmtDuration(durationSeconds(rec)));
   return json({ ok: true, mode, code });
 }

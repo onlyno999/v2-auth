@@ -186,6 +186,12 @@ $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); }
   if (data && data.ok) enterConsole();
 })();
 
+function machineOk(v) {
+  // Machine codes are 16 Crockford chars grouped XXXX-XXXX-XXXX-XXXX
+  // (no I/L/O/U). An activation code (V2O-…) must never land here.
+  return /^[0-9A-HJKMNP-TV-Z]{16}$/.test((v || "").toUpperCase().replace(/[\s-]/g, ""));
+}
+const BAD_MACHINE_MSG = "这不是机器码，像是激活码；机器码在客户端激活页上，格式是 XXXX-XXXX-XXXX-XXXX";
 function durFields(valId, unitId) {
   const unit = $(unitId).value;
   if (unit === "perm") return { days: 0 };
@@ -193,19 +199,21 @@ function durFields(valId, unitId) {
 }
 $("issueBtn").onclick = async () => {
   const body = { machineCode: $("mc").value.trim(), ...durFields("durVal", "durUnit"), note: $("note").value.trim(), channel: $("channel").value, mode: "code" };
-  if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
+  if (!machineOk(body.machineCode)) { $("issueMsg").textContent = BAD_MACHINE_MSG; return; }
   const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
   if (data.ok) {
     $("codeText").textContent = data.code;
     $("codeOut").classList.remove("hidden");
     $("issueMsg").textContent = "";
-  } else $("issueMsg").textContent = "失败：" + (data.reason || "");
+  } else $("issueMsg").textContent = "失败：" + (data.reason === "bad_machine" ? BAD_MACHINE_MSG : data.reason || "");
 };
 $("openBtn").onclick = async () => {
   const body = { machineCode: $("mc").value.trim(), ...durFields("durVal", "durUnit"), note: $("note").value.trim(), channel: $("channel").value, mode: "open" };
-  if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
+  if (!machineOk(body.machineCode)) { $("issueMsg").textContent = BAD_MACHINE_MSG; return; }
   const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
-  $("issueMsg").textContent = data.ok ? "已开通：让用户在客户端点「我已付款」即可进入" : "失败：" + (data.reason || "");
+  $("issueMsg").textContent = data.ok
+    ? "已开通：让用户在客户端点「直接开通（卖家已开通时点这里）」即可进入"
+    : "失败：" + (data.reason === "bad_machine" ? BAD_MACHINE_MSG : data.reason || "");
   if (data.ok) loadDevices();
 };
 $("copyBtn").onclick = () => navigator.clipboard.writeText($("codeText").textContent);
@@ -250,7 +258,7 @@ async function loadDevices() {
   const pb = $("pendingBox");
   if (data.pending_open && data.pending_open.length) {
     pb.classList.remove("hidden");
-    pb.innerHTML = "待领取开通（用户还没点「我已付款」）：<span class='mono'>" + data.pending_open.join("</span>, <span class='mono'>") + "</span>";
+    pb.innerHTML = "待领取开通（用户还没在客户端点「直接开通」领取）：<span class='mono'>" + data.pending_open.join("</span>, <span class='mono'>") + "</span>";
   } else pb.classList.add("hidden");
   renderIssued(data.issued || []);
   if (!data.devices.length) {

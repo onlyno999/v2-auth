@@ -49,6 +49,22 @@ export function newToken() {
   return b64urlEncode(rnd);
 }
 
+// ---------- machine codes ----------
+// App machine codes are 16 Crockford-Base32 chars grouped 4-4-4-4
+// (alphabet excludes I, L, O, U). Normalize by trimming, uppercasing
+// and dropping spaces/dashes, then require exactly 16 alphabet chars
+// and re-group canonically. This specifically rejects activation
+// codes (V2O-… is 23 chars and contains O) pasted into the machine
+// field — the mix-up that silently parked a direct-open under a code
+// name, where no real machine could ever claim it.
+export const MACHINE_RE = /^[0-9A-HJKMNP-TV-Z]{16}$/;
+export function normalizeMachineCode(raw) {
+  const s = String(raw || "").toUpperCase().replace(/[\s-]/g, "");
+  if (!MACHINE_RE.test(s)) return null;
+  return s.match(/.{4}/g).join("-");
+}
+export const isMachineCode = (raw) => normalizeMachineCode(raw) !== null;
+
 // ---------- code vault ----------
 // Newly issued codes also keep an AES-GCM sealed copy (key derived
 // from SESSION_SECRET) so the seller can re-copy a code he handed out
