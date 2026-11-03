@@ -143,6 +143,14 @@ export async function onRequestPost({ request, env }) {
       await putGuest(env, id, { ...rec, expires_at, days });
       return json({ ok: true, expires_at });
     }
+    case "rename": {
+      // Change the guest's username (his display / page label).
+      // Id, password, expiry and the /s/ link are untouched.
+      const username = String(body.username || "").trim();
+      if (!username || username.length > 24) return json({ ok: false, reason: "bad_username" }, 400);
+      await putGuest(env, id, { ...rec, username });
+      return json({ ok: true, username });
+    }
     case "password":
       if (!body.password || String(body.password).length < 6) {
         return json({ ok: false, reason: "weak_password" }, 400);

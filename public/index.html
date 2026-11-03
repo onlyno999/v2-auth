@@ -494,6 +494,7 @@ async function loadGuests() {
     const page = `${location.origin}/g/${g.id}`;
     const st = g.status === "disabled" ? "已停用" : (g.expired ? "已到期" : "正常");
     guestLimitMap[g.id] = g.fetch ? g.fetch.daily_limit : 10;
+    guestNameMap[g.id] = g.username || "";
     return `<tr>
     <td>${g.username}<div class="muted">${g.note || ""}${g.channel === "dist" ? " · 分销" : ""}${g.dist ? "(" + g.dist + ")" : ""}</div></td>
     <td class="mono" data-label="专属页面">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
@@ -505,6 +506,7 @@ async function loadGuests() {
       : `<button class="small danger" onclick="guestAct('${g.id}','disable')">停用</button>`}
       <button class="small ghost" onclick="editGuestExpiry('${g.id}', ${g.expires_at || 0})">修改时间</button>
       <button class="small ghost" onclick="guestLimit('${g.id}')">拉取上限</button>
+      <button class="small ghost" onclick="guestAct('${g.id}','rename')">改名</button>
       <button class="small ghost" onclick="guestAct('${g.id}','password')">改密码</button></td></tr>`;
   }).join("");
   applyFilter("qGuests", "guestBody");
@@ -515,6 +517,7 @@ async function copyGuestPage(page) {
 }
 window.copyGuestPage = copyGuestPage;
 const guestLimitMap = {};
+const guestNameMap = {};
 async function guestLimit(id) {
   const cur = guestLimitMap[id];
   const v = prompt(`每日拉取上限（当前：${cur === 0 ? "不限" : (cur ?? 10) + " 次"}）\n填次数（0 = 不限），留空 = 恢复默认 10 次`, cur === 0 ? "0" : String(cur ?? 10));
@@ -535,6 +538,11 @@ async function guestAct(id, action) {
     const d = prompt("延期天数（可负数）：", "30");
     if (d === null || d === "") return;
     body.days = Number(d);
+  }
+  if (action === "rename") {
+    const n = prompt("新的用户名（客户名）：", guestNameMap[id] || "");
+    if (n === null || !n.trim()) return;
+    body.username = n.trim();
   }
   if (action === "password") {
     const p = prompt("给他设置新密码（至少 6 位）：");
