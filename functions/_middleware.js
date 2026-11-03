@@ -2,12 +2,12 @@ import { SLUG_RE, RESERVED_SLUGS } from "./lib/core.js";
 import { D1KV } from "./lib/d1kv.js";
 
 // Two jobs, in order:
-// 1. Storage backend selection. While no D1 binding exists,
-//    env.V2 stays the KV namespace and nothing changes (safe to
-//    deploy before the dashboard binding). Once a D1 database is
-//    bound as DB, env.V2 becomes the D1 shim for every route —
-//    including the portal checks below — and env.KV_ORIG keeps a
-//    handle on the real KV namespace for the migration endpoint.
+// 1. Storage backend: env.V2 becomes the D1 shim for every route —
+//    including the portal checks below. (2026-11-04: the owner
+//    cut over to D1 and deliberately discarded the old KV data —
+//    no migration, no KV fallback. The KV binding itself can be
+//    removed from the dashboard; every route passes through here
+//    first, so nothing ever touches the raw binding.)
 // 2. Portal routing:
 //    - GET /<slug> (e.g. https://domain/mmm) serves the distributor
 //      console when a distributor with that slug exists.
@@ -16,7 +16,6 @@ import { D1KV } from "./lib/d1kv.js";
 export async function onRequest(context) {
   const { request, env } = context;
   if (env.DB && !env.__d1kv) {
-    env.KV_ORIG = env.V2;
     env.V2 = new D1KV(env.DB);
     env.__d1kv = true;
   }

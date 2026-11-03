@@ -96,11 +96,6 @@
       </div>
     </div>
 
-    <div class="card" id="migrateBox">
-      <div><b>存储迁移（KV → D1）</b>：D1 绑定生效后，点这个按钮把老 KV 里的数据一次性搬进 D1。只需点一次；搬完这里会显示各类记录的条数。</div>
-      <div style="margin-top:8px"><button id="migrateBtn" class="small">开始迁移</button> <span id="migrateMsg" class="muted"></span></div>
-    </div>
-
     <h2>设备总表 <button id="refreshBtn" class="ghost small">刷新</button></h2>
     <div id="pendingBox" class="card hidden" style="margin-bottom:10px"></div>
     <div class="card">
@@ -366,20 +361,6 @@ async function loadDevices() {
   }).join("");
 }
 $("refreshBtn").onclick = loadDevices;
-
-$("migrateBtn").onclick = async () => {
-  if (!confirm("把老 KV 的数据一次性搬进 D1？只需执行一次。")) return;
-  $("migrateMsg").textContent = "迁移中…";
-  const { status, data } = await api("/api/admin/migrate", {
-    method: "POST", body: JSON.stringify({ confirm: "migrate" }),
-  });
-  if (data.ok) {
-    $("migrateMsg").textContent = "迁移完成：" + Object.entries(data.counts || {}).map(([k, v]) => `${k} ${v} 条`).join("，");
-    loadDevices(); loadDists(); loadGuests();
-  } else {
-    $("migrateMsg").textContent = `失败（HTTP ${status}：${data.reason || ""}）——若提示 no_kv_or_no_d1，是 D1 绑定还没生效；若报 list 额度，等早上 8 点额度重置后再点。`;
-  }
-};
 
 async function loadDists() {
   const { data } = await api("/api/admin/dist");
