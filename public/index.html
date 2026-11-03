@@ -127,6 +127,7 @@
         <input id="dname" placeholder="分销商名称" style="width:150px">
         <input id="dpw" placeholder="密码（可留空，他自己设）" style="width:190px">
         <input id="dquota" type="number" placeholder="额度（个数）" style="width:120px" value="100">
+        <select id="dparent" style="width:210px"><option value="">上级：总后台直属（第1级）</option></select>
         <button id="distCreateBtn">添加分销商</button>
         <span id="distMsg" class="muted"></span>
       </div>
@@ -431,11 +432,14 @@ $("refreshBtn").onclick = loadDevices;
 async function loadDists() {
   const { data } = await api("/api/admin/dist");
   if (!data.ok) { $("distBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
-  const curParent = $("dparent").value;
-  $("dparent").innerHTML = '<option value="">上级：总后台直属（第1级）</option>' + data.distributors
-    .filter((x) => (x.level || 1) < 5)
-    .map((x) => `<option value="${x.slug}">上级：${x.name || x.slug}（${x.slug} · 第${x.level || 1}级 · 下级 ${x.children || 0}/3）</option>`).join("");
-  $("dparent").value = [...$("dparent").options].some((o) => o.value === curParent) ? curParent : "";
+  const dp = $("dparent");
+  if (dp) {
+    const curParent = dp.value;
+    dp.innerHTML = '<option value="">上级：总后台直属（第1级）</option>' + data.distributors
+      .filter((x) => (x.level || 1) < 5)
+      .map((x) => `<option value="${x.slug}">上级：${x.name || x.slug}（${x.slug} · 第${x.level || 1}级 · 下级 ${x.children || 0}/3）</option>`).join("");
+    dp.value = [...dp.options].some((o) => o.value === curParent) ? curParent : "";
+  }
   if (!data.distributors.length) {
     $("distBody").innerHTML = '<tr><td colspan="5" class="muted">还没有分销商</td></tr>';
     return;
