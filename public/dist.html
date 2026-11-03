@@ -31,9 +31,19 @@
   <div class="muted" id="quotaLine"></div>
 
   <div id="loginBox" class="card" style="margin-top:14px">
-    <div class="row">
-      <input id="pw" type="password" placeholder="分销商密码" style="flex:1;min-width:200px">
-      <button id="loginBtn">登录</button>
+    <div id="loginForm">
+      <div class="row">
+        <input id="pw" type="password" placeholder="分销商密码" style="flex:1;min-width:200px">
+        <button id="loginBtn">登录</button>
+      </div>
+    </div>
+    <div id="setupForm" class="hidden">
+      <div class="muted" style="margin-bottom:8px">首次打开：请设置你的登录密码（至少 6 位），设置后自动登录。</div>
+      <div class="row">
+        <input id="spw1" type="password" placeholder="设置密码" style="flex:1;min-width:160px">
+        <input id="spw2" type="password" placeholder="再输一遍" style="flex:1;min-width:160px">
+        <button id="setupBtn">设置密码并登录</button>
+      </div>
     </div>
     <div id="msg"></div>
   </div>
@@ -99,10 +109,27 @@ async function doLogin() {
     method: "POST", body: JSON.stringify({ slug, password: $("pw").value }),
   });
   if (status === 200 && data.ok) loadMe();
+  else if (data.reason === "needs_setup") showSetup("请先设置你的登录密码");
   else $("msg").textContent = data.reason === "no_distributor" ? "此地址不存在或已被停用" : "密码不对";
 }
 $("loginBtn").onclick = doLogin;
 $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+
+function showSetup(note) {
+  $("loginForm").classList.add("hidden");
+  $("setupForm").classList.remove("hidden");
+  if (note) $("msg").textContent = note;
+}
+$("setupBtn").onclick = async () => {
+  const p1 = $("spw1").value, p2 = $("spw2").value;
+  if (p1.length < 6) { $("msg").textContent = "密码至少 6 位"; return; }
+  if (p1 !== p2) { $("msg").textContent = "两次输入不一致"; return; }
+  const { status, data } = await api("/api/dist/setup", {
+    method: "POST", body: JSON.stringify({ slug, password: p1 }),
+  });
+  if (status === 200 && data.ok) loadMe();
+  else $("msg").textContent = "设置失败：" + (data.reason || "");
+};
 
 $("issueBtn").onclick = async () => {
   const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), mode: "code" };
@@ -136,7 +163,13 @@ async function loadDevices() {
     <td>${d.lic.status}</td></tr>`).join("");
 }
 $("refreshBtn").onclick = loadDevices;
-loadMe();
+(async () => {
+  const me = await api("/api/dist/me");
+  if (me.data && me.data.ok) { loadMe(); return; }
+  const st = await api("/api/dist/state?slug=" + encodeURIComponent(slug));
+  if (st.data && st.data.ok && st.data.needs_setup) showSetup();
+  else if (st.data && st.data.ok) $("title").textContent = "分销商后台 · " + (st.data.name || "");
+})();
 </script>
 </body>
 </html>

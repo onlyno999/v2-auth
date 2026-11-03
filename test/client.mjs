@@ -192,5 +192,24 @@ const disableDist = await j("/api/admin/dist", { slug: "mmm", action: "disable" 
 const distLoginDisabled = await j("/api/dist/login", { slug: "mmm", password: "dist-pw-1" });
 check("disabled distributor cannot log in", disableDist.status === 200 && distLoginDisabled.status === 401);
 
+// distributor self-setup: admin creates WITHOUT a password; the
+// distributor sets his own on first visit (saved hashed in KV).
+const createDist2 = await j("/api/admin/dist", { action: "create", slug: "abc", name: "自设密码分销", quota: 5 }, { cookie });
+const state1 = await (await fetch(BASE + "/api/dist/state?slug=abc")).json();
+check("create without password -> needs_setup", createDist2.status === 200 && state1.ok === true && state1.needs_setup === true);
+const loginBeforeSetup = await j("/api/dist/login", { slug: "abc", password: "whatever1" });
+check("login blocked before setup", loginBeforeSetup.status === 401 && loginBeforeSetup.data.reason === "needs_setup");
+const setupRes = await fetch(BASE + "/api/dist/setup", {
+  method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ slug: "abc", password: "self-set-1" }),
+});
+const sCookie = (setupRes.headers.get("set-cookie") || "").split(";")[0];
+check("distributor sets own password + auto-login", setupRes.status === 200 && sCookie.startsWith("dsess="));
+const setupAgain = await j("/api/dist/setup", { slug: "abc", password: "another-1" });
+check("second setup rejected", setupAgain.status === 409);
+const resetPw = await j("/api/admin/dist", { slug: "abc", action: "resetpw" }, { cookie });
+const state2 = await (await fetch(BASE + "/api/dist/state?slug=abc")).json();
+check("admin reset -> needs_setup again", resetPw.status === 200 && state2.needs_setup === true);
+
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);
 process.exit(fail ? 1 : 0);

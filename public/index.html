@@ -97,12 +97,12 @@
       <div class="row">
         <input id="dslug" placeholder="登录标识，如 mmm" style="width:150px" class="mono">
         <input id="dname" placeholder="分销商名称" style="width:150px">
-        <input id="dpw" placeholder="他的登录密码（≥6位）" style="width:170px">
+        <input id="dpw" placeholder="密码（可留空，他自己设）" style="width:190px">
         <input id="dquota" type="number" placeholder="额度（个数）" style="width:120px" value="100">
         <button id="distCreateBtn">添加分销商</button>
         <span id="distMsg" class="muted"></span>
       </div>
-      <div class="muted" style="margin:8px 0">添加后，他的登录地址就是本站域名后面加 /标识，例如 https://你的域名/mmm —— 他只能给自己客户发码（走分销订阅）、看自己的客户；发码扣额度，最多 365 天。</div>
+      <div class="muted" style="margin:8px 0">添加后，他的专用链接就是本站域名后面加 /标识，例如 https://你的域名/mmm —— 密码不用你管：他第一次打开链接时自己设置（存服务器，你看不到）；他只能给自己客户发码（走分销订阅）、看自己的客户；发码扣额度，最多 365 天。</div>
       <table>
         <thead><tr><th>标识 / 名称</th><th>登录地址</th><th>额度</th><th>状态</th><th>操作</th></tr></thead>
         <tbody id="distBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
@@ -230,20 +230,16 @@ async function loadDists() {
     <td class="mono">${d.slug}<div class="muted">${d.name || ""}</div></td>
     <td class="mono">${location.origin}/${d.slug}</td>
     <td>${d.used} / ${d.quota < 0 ? "不限" : d.quota}</td>
-    <td>${d.status === "active" ? "正常" : "已停用"}</td>
+    <td>${!d.has_pw ? "待他设密码" : (d.status === "active" ? "正常" : "已停用")}</td>
     <td>${d.status === "active"
       ? `<button class="small danger" onclick="distAct('${d.slug}','disable')">停用</button>`
       : `<button class="small ghost" onclick="distAct('${d.slug}','enable')">恢复</button>`}
-      <button class="small ghost" onclick="distAct('${d.slug}','password')">改密码</button>
+      <button class="small ghost" onclick="distAct('${d.slug}','resetpw')">重置密码</button>
       <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button></td></tr>`).join("");
 }
 async function distAct(slug, action) {
   const body = { slug, action };
-  if (action === "password") {
-    const pw = prompt(`给分销商 ${slug} 设置新密码（至少 6 位）：`);
-    if (!pw) return;
-    body.password = pw;
-  }
+  if (action === "resetpw" && !confirm(`重置 ${slug} 的密码？他下次打开链接时要重新设置密码。`)) return;
   if (action === "quota") {
     const q = prompt(`分销商 ${slug} 的总额度（个数，-1 = 不限）：`);
     if (q === null || q === "") return;
@@ -262,7 +258,7 @@ $("distCreateBtn").onclick = async () => {
     password: $("dpw").value,
     quota: Number($("dquota").value || 100),
   };
-  if (!body.slug || !body.password) { $("distMsg").textContent = "标识和密码必填"; return; }
+  if (!body.slug) { $("distMsg").textContent = "标识必填（密码可留空，他首次打开自己设）"; return; }
   const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify(body) });
   $("distMsg").textContent = data.ok
     ? `已添加：他的登录地址 ${location.origin}/${body.slug}`
