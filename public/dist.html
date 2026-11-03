@@ -80,11 +80,11 @@
     <div class="card">
       <div class="row">
         <input id="mc" placeholder="客户的机器码" style="flex:2;min-width:220px" class="mono">
-        <select id="days">
-          <option value="30">30 天</option>
-          <option value="90">90 天</option>
-          <option value="180">180 天</option>
-          <option value="365" selected>365 天</option>
+        <input id="durVal" type="number" min="1" value="365" style="width:90px">
+        <select id="durUnit">
+          <option value="minute">分钟</option>
+          <option value="hour">小时</option>
+          <option value="day" selected>天</option>
         </select>
         <input id="note" placeholder="备注（客户名）" style="flex:1;min-width:140px">
       </div>
@@ -214,7 +214,7 @@ $("setupBtn").onclick = async () => {
 };
 
 $("issueBtn").onclick = async () => {
-  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), mode: "code" };
+  const body = { machineCode: $("mc").value.trim(), durationValue: Number($("durVal").value || 0), durationUnit: $("durUnit").value, note: $("note").value.trim(), mode: "code" };
   if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
   const { data } = await api("/api/dist/issue", { method: "POST", body: JSON.stringify(body) });
   if (data.ok) {
@@ -222,10 +222,10 @@ $("issueBtn").onclick = async () => {
     $("codeOut").classList.remove("hidden");
     $("issueMsg").textContent = "";
     loadMe();
-  } else $("issueMsg").textContent = "失败：" + (data.reason === "quota_exhausted" ? "额度用完了，联系上级补充" : data.reason === "limit_range" ? "每日拉取上限只能设 1 到 10 次" : data.reason || "");
+  } else $("issueMsg").textContent = "失败：" + (data.reason === "quota_exhausted" ? "额度用完了，联系上级补充" : data.reason === "no_permanent" ? "分销不能设永久" : data.reason === "days_range" ? "最长 365 天" : data.reason === "bad_duration" ? "时长不对（最少 1 分钟）" : data.reason || "");
 };
 $("openBtn").onclick = async () => {
-  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), mode: "open" };
+  const body = { machineCode: $("mc").value.trim(), durationValue: Number($("durVal").value || 0), durationUnit: $("durUnit").value, note: $("note").value.trim(), mode: "open" };
   if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
   const { data } = await api("/api/dist/issue", { method: "POST", body: JSON.stringify(body) });
   $("issueMsg").textContent = data.ok ? "已开通：让客户在客户端点「直接开通（卖家已开通时点这里）」即可进入" : "失败：" + (data.reason || "");
