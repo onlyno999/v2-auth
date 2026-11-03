@@ -229,9 +229,19 @@ const dev5 = await newDeviceKey();
 const act5 = await j("/api/activate", { machineCode: M5, code: dIssue1.data.code, pubkey: dev5.pubkey });
 const sub5 = await signedCall("/api/subscription", M5, dev5.kp);
 check("dist customer pulls DIST subscription", act5.status === 200 && sub5.status === 200 && sub5.text === expectedDist);
-const dIssue2 = await j("/api/dist/issue", { machineCode: M6, days: 90, note: "", mode: "code" }, { cookie: dcookie });
-const dIssue3 = await j("/api/dist/issue", { machineCode: M7, days: 90, note: "", mode: "code" }, { cookie: dcookie });
+const dIssue2 = await j("/api/dist/issue", { machineCode: M6, days: 30, note: "", mode: "code" }, { cookie: dcookie });
+const dIssue3 = await j("/api/dist/issue", { machineCode: M7, days: 30, note: "", mode: "code" }, { cookie: dcookie });
 check("quota exhausted at limit", dIssue2.status === 200 && dIssue3.status === 403 && dIssue3.data.reason === "quota_exhausted");
+// Duration-weighted quota (owner, 2026-11-04): a 90-day card costs
+// 3 units — a quota-2 distributor cannot afford one at all.
+await j("/api/admin/dist", { action: "create", slug: "qq2", name: "权重测试", password: "dist-pw-1", quota: 2 }, { cookie });
+const qq2LoginRes = await fetch(BASE + "/api/dist/login", {
+  method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ slug: "qq2", password: "dist-pw-1" }),
+});
+const qq2Cookie = (qq2LoginRes.headers.get("set-cookie") || "").split(";")[0];
+const dWeighted = await j("/api/dist/issue", { machineCode: "QQ22-MACH-0000-0001", days: 90, mode: "code" }, { cookie: qq2Cookie });
+check("90-day card costs 3 quota units", dWeighted.status === 403 && dWeighted.data.cost === 3 && dWeighted.data.remaining === 2);
 const dDevices = await fetch(BASE + "/api/dist/devices", { headers: { cookie: dcookie } }).then((r) => r.json());
 check("dist sees only own customers", dDevices.ok === true && dDevices.devices.length === 1 && dDevices.devices[0].machine === M5);
 const disableDist = await j("/api/admin/dist", { slug: "mmm", action: "disable" }, { cookie });

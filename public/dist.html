@@ -119,6 +119,12 @@
       </table>
     </div>
 
+    <h2>进货流水</h2>
+    <div class="card">
+      <div class="muted" style="margin-bottom:6px">额度就是货：你从上级进货、上级给你补额度，这里记一笔；你给下级补额度，也记一笔。钱你们线下结，这里只留账。</div>
+      <div id="stockMine" class="muted">加载中…</div>
+    </div>
+
     <h2>游客客户（小火箭等第三方客户端）</h2>
     <div class="card">
       <div class="row">
@@ -188,6 +194,7 @@ async function loadMe() {
     loadDevices();
     loadGuests();
     loadSubs();
+    loadStock();
   }
 }
 async function doLogin() {
@@ -235,7 +242,7 @@ $("issueBtn").onclick = async () => {
     $("codeOut").classList.remove("hidden");
     $("issueMsg").textContent = "";
     loadMe();
-  } else $("issueMsg").textContent = "失败：" + (data.reason === "quota_exhausted" ? "额度用完了，联系上级补充" : data.reason === "no_permanent" ? "分销不能设永久" : data.reason === "days_range" ? "最长 365 天" : data.reason === "bad_duration" ? "时长不对（最少 1 分钟）" : data.reason || "");
+  } else $("issueMsg").textContent = "失败：" + (data.reason === "quota_exhausted" ? `额度不够：本次要扣 ${data.cost || 1} 个额度（按时长算：一个月 1 个），你只剩 ${data.remaining ?? 0} 个，联系上级补充` : data.reason === "no_permanent" ? "分销不能设永久" : data.reason === "days_range" ? "最长 365 天" : data.reason === "bad_duration" ? "时长不对（最少 1 分钟）" : data.reason || "");
 };
 $("openBtn").onclick = async () => {
   const body = { machineCode: $("mc").value.trim(), durationValue: Number($("durVal").value || 0), durationUnit: $("durUnit").value, note: $("note").value.trim(), mode: "open" };
@@ -308,6 +315,17 @@ async function subAct(slug, action) {
   loadSubs();
 }
 window.subAct = subAct;
+
+async function loadStock() {
+  const { data } = await api("/api/dist/stock");
+  if (!data.ok) { $("stockMine").textContent = "加载失败"; return; }
+  const line = (x, who) => `<div>${fmt(x.at)} · ${who} <b>+${x.delta}</b> 个额度</div>`;
+  const bought = data.bought.slice(0, 10).map((x) => line(x, x.from === "admin" ? "总控制台给你补货" : `上级 ${x.from} 给你补货`)).join("");
+  const granted = data.granted.slice(0, 10).map((x) => line(x, `你给下级 ${x.dist} 补货`)).join("");
+  $("stockMine").innerHTML =
+    `<div style="margin-bottom:4px"><b>我进的货</b></div>` + (bought || '<div class="muted">还没有记录</div>') +
+    `<div style="margin:10px 0 4px"><b>我放给下级的货</b></div>` + (granted || '<div class="muted">还没有记录</div>');
+}
 
 
 async function loadGuests() {

@@ -2,7 +2,7 @@ import {
   json, readJson, nowSec, distSlugFromRequest, getDist, putDist, sha256hex,
   bumpDataVersion,
   getGuest, putGuest, newGuestId, guestProblem, vaultSeal, SLUG_RE, guestLimitInput, guestFetchView, guestFetchReset,
-  parseDurationSec, durationSeconds, spanDurationSeconds, fmtDuration, logEvent,
+  parseDurationSec, quotaCostFor, durationSeconds, spanDurationSeconds, fmtDuration, logEvent,
 } from "../../lib/core.js";
 
 // Distributor-side guest accounts: a distributor adds his own
@@ -75,8 +75,9 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: false, reason: "exists" }, 409);
     }
     const dist = await getDist(env, slug);
-    if (dist.quota >= 0 && dist.used >= dist.quota) {
-      return json({ ok: false, reason: "quota_exhausted" }, 403);
+    const cost = quotaCostFor(sec);
+    if (dist.quota >= 0 && dist.used + cost > dist.quota) {
+      return json({ ok: false, reason: "quota_exhausted", cost, remaining: dist.quota - dist.used }, 403);
     }
     let id = newGuestId();
     for (let i = 0; (await getGuest(env, id)) && i < 5; i++) id = newGuestId();
@@ -98,9 +99,9 @@ export async function onRequestPost({ request, env }) {
       dist: slug,
       daily_limit: lim.set && lim.value !== null ? lim.value : undefined,
     });
-    await putDist(env, slug, { ...dist, used: dist.used + 1 });
+    await putDist(env, slug, { ...dist, used: dist.used + cost });
     await logEvent(env, "dist_guest_create", username, slug);
-    return json({ ok: true, id, path: "/g/" + id });
+    return json({ ok: true, id, path: "/g/" + id, cost });
   }
 
   const id = String(body.id || "");

@@ -1,7 +1,7 @@
 import {
   json, readJson, nowSec, sha256hex, getDist, putDist, distSlugFromRequest,
   SLUG_RE, RESERVED_SLUGS, bumpDataVersion, moveDistributor, listDistChildren,
-  distLevel,
+  distLevel, recordStock,
 } from "../../lib/core.js";
 
 // The distributor tree (owner's design, 2026-11-04): five levels,
@@ -99,9 +99,12 @@ export async function onRequestPost({ request, env }) {
       await putDist(env, child, { ...rec, name });
       return json({ ok: true });
     }
-    case "quota":
-      await putDist(env, child, { ...rec, quota: Math.floor(body.quota ?? rec.quota) });
+    case "quota": {
+      const next = Math.floor(body.quota ?? rec.quota);
+      await putDist(env, child, { ...rec, quota: next });
+      await recordStock(env, child, slug, next - (rec.quota || 0));
       return json({ ok: true });
+    }
     case "resetpw":
       await putDist(env, child, { ...rec, pw_hash: null });
       return json({ ok: true });

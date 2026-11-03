@@ -138,6 +138,12 @@
       </table>
     </div>
 
+    <h2>进货流水</h2>
+    <div class="card">
+      <div class="muted" style="margin-bottom:8px">谁给谁补了多少额度都在这里（最新的在上面）。分销商之间的补货也会记——钱他们线下结，你这里能看到全网的进货动态。</div>
+      <div id="stockAll" class="muted">加载中…</div>
+    </div>
+
     <h2>游客客户（小火箭等第三方客户端）</h2>
     <div class="card">
       <div class="row">
@@ -196,6 +202,7 @@ function enterConsole() {
   $("console").classList.remove("hidden");
   loadDevices();
   loadDists();
+  loadStock();
   loadGuests();
 }
 async function doLogin() {
@@ -473,6 +480,14 @@ async function distAct(slug, action) {
   loadDists();
 }
 window.distAct = distAct;
+
+async function loadStock() {
+  const { data } = await api("/api/admin/stock");
+  if (!data.ok) { $("stockAll").textContent = "加载失败"; return; }
+  $("stockAll").innerHTML = data.stock.length
+    ? data.stock.slice(0, 30).map((x) => `<div>${fmt(x.at)} · ${x.from === "admin" ? "总控制台" : "分销商 " + x.from} 给 <b>${x.dist}</b> 补了 <b>+${x.delta}</b> 个额度</div>`).join("")
+    : "还没有进货记录";
+}
 
 $("distCreateBtn").onclick = async () => {
   const body = {

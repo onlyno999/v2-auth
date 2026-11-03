@@ -420,6 +420,40 @@ export async function listDistChildren(env, slug) {
   } while (cursor);
   return out;
 }
+
+// Quota is priced by DURATION (owner, 2026-11-04: the tree runs
+// on margin — a year card may not cost the same shelf space as a
+// month card). One unit of quota = one average month
+// (365.25/12 days); any issue costs ceil(duration / month),
+// minimum 1. A 365-day card costs exactly 12.
+export const MONTH_SEC = 2629800;
+export function quotaCostFor(durationSec) {
+  return Math.max(1, Math.ceil(durationSec / MONTH_SEC));
+}
+
+// Restock ledger: every quota INCREASE granted to a distributor
+// is a purchase from his parent (or from the admin console) —
+// money settles offline, the system only keeps the book. Key
+// stk:<ts>:<rand> sorts chronologically.
+export async function recordStock(env, dist, from, delta) {
+  if (!delta || delta <= 0) return;
+  const key = "stk:" + nowSec() + ":" + Math.random().toString(36).slice(2, 8);
+  await env.V2.put(key, JSON.stringify({ dist, from, delta, at: nowSec() }));
+}
+export async function listStock(env, limit = 300) {
+  const out = [];
+  let cursor;
+  do {
+    const page = await env.V2.list({ prefix: "stk:", limit: 200, cursor });
+    cursor = page.list_complete ? undefined : page.cursor;
+    for (const k of page.keys) {
+      const raw = await env.V2.get(k.name);
+      if (raw) out.push(JSON.parse(raw));
+    }
+  } while (cursor);
+  return out.sort((a, b) => b.at - a.at).slice(0, limit);
+}
+
 export function distLevel(rec) {
   return rec && Number.isFinite(rec.level) ? rec.level : 1;
 }

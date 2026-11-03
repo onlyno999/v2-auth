@@ -1,7 +1,7 @@
 import {
   json, readJson, nowSec, distSlugFromRequest, getDist, putDist,
   newLicenseCode, codeKey, logEvent, vaultSeal, normalizeMachineCode, bumpDataVersion,
-  parseDurationSec, fmtDuration,
+  parseDurationSec, fmtDuration, quotaCostFor,
 } from "../../lib/core.js";
 
 // POST {machineCode, durationValue+durationUnit | days, note, mode}
@@ -23,8 +23,9 @@ export async function onRequestPost({ request, env }) {
   const days = Math.ceil(sec / 86400); // coarse compatibility field
 
   const rec = await getDist(env, slug);
-  if (rec.quota >= 0 && rec.used >= rec.quota) {
-    return json({ ok: false, reason: "quota_exhausted" }, 403);
+  const cost = quotaCostFor(sec);
+  if (rec.quota >= 0 && rec.used + cost > rec.quota) {
+    return json({ ok: false, reason: "quota_exhausted", cost, remaining: rec.quota - rec.used }, 403);
   }
   const code = newLicenseCode();
   const key = await codeKey(code);
@@ -43,7 +44,7 @@ export async function onRequestPost({ request, env }) {
     expires_at: null,
   }));
   if (mode === "open") await env.V2.put("open:" + machine, key);
-  await putDist(env, slug, { ...rec, used: rec.used + 1 });
+  await putDist(env, slug, { ...rec, used: rec.used + cost });
   await logEvent(env, "dist_issue", machine, `${slug}:${fmtDuration(sec)}`);
-  return json(mode === "open" ? { ok: true, mode } : { ok: true, mode, code });
+  return json(mode === "open" ? { ok: true, mode, cost } : { ok: true, mode, code, cost });
 }

@@ -1,6 +1,6 @@
 import {
   json, readJson, nowSec, isAdmin, sha256hex, getDist, putDist, SLUG_RE, RESERVED_SLUGS,
-  bumpDataVersion, cachedPayload, moveDistributor, listDistChildren, distLevel,
+  bumpDataVersion, cachedPayload, moveDistributor, listDistChildren, distLevel, recordStock,
 } from "../../lib/core.js";
 
 // GET -> all distributors. POST -> create / update / disable / enable.
@@ -100,6 +100,7 @@ export async function onRequestPost({ request, env }) {
       parent,
       created_at: nowSec(),
     });
+    await recordStock(env, slug, "admin", Number.isFinite(body.quota) ? Math.floor(body.quota) : 100);
     return json({ ok: true, slug });
   }
 
@@ -141,9 +142,12 @@ export async function onRequestPost({ request, env }) {
       await moveDistributor(env, slug, next, rec);
       return json({ ok: true, slug: next });
     }
-    case "quota":
-      await putDist(env, slug, { ...rec, quota: Math.floor(body.quota ?? rec.quota) });
+    case "quota": {
+      const next = Math.floor(body.quota ?? rec.quota);
+      await putDist(env, slug, { ...rec, quota: next });
+      await recordStock(env, slug, "admin", next - (rec.quota || 0));
       return json({ ok: true });
+    }
     case "password":
       if (!body.password || String(body.password).length < 6) {
         return json({ ok: false, reason: "weak_password" }, 400);
