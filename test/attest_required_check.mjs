@@ -1,8 +1,9 @@
-// Focused check: attestation is required BY DEFAULT (no
-// ATTEST_REQUIRED in this server's env). Run against a dedicated
-// dev server (port 8790) with a fresh KV state. A code activation
-// without an attestation chain must be refused (attest_missing);
-// nothing gets issued to an unproven build.
+// Attestation policy check (revised after the 2026-11-04 incident):
+// attestation is verified WHEN PRESENT and a bad chain is refused,
+// but a chainless activation must still succeed by default —
+// pre-2.0 clients cannot produce a chain, and requiring one bricked
+// every activation. Run against a dedicated dev server (port 8790)
+// with a fresh KV state and NO ATTEST_REQUIRED in its env.
 const BASE = "http://127.0.0.1:8790";
 let pass = 0, fail = 0;
 const check = (name, cond, extra = "") => {
@@ -30,10 +31,12 @@ const issue = await j("/api/admin/issue", { machineCode: M, days: 30, mode: "cod
 check("admin issues a code", issue.status === 200 && !!issue.data.code, JSON.stringify(issue.data).slice(0, 60));
 
 const act = await j("/api/activate", { machineCode: M, code: issue.data.code, pubkey: "x", platform: "android" });
-check("chainless activation refused by default", act.status === 403 && act.data.reason === "attest_missing", JSON.stringify(act.data));
+check("chainless activation SUCCEEDS by default (legacy clients)", act.status === 200 && !!act.data.token, JSON.stringify(act.data).slice(0, 60));
 
-const bogus = await j("/api/activate", { machineCode: M, code: issue.data.code, pubkey: "x", platform: "android", attestation: ["AAAA"] });
-check("garbage chain refused too", bogus.status === 403 && bogus.data.reason !== "attest_missing", JSON.stringify(bogus.data));
+const M2 = "TEST-MACH-0000-0010";
+const issue2 = await j("/api/admin/issue", { machineCode: M2, days: 30, mode: "code" }, { cookie });
+const bogus = await j("/api/activate", { machineCode: M2, code: issue2.data.code, pubkey: "x", platform: "android", attestation: ["AAAA"] });
+check("garbage chain still refused (verify-when-present)", bogus.status === 403 && bogus.data.reason !== "attest_missing", JSON.stringify(bogus.data));
 
 console.log(`\n==== ${pass} passed, ${fail} failed ====`);
 process.exit(fail ? 1 : 0);

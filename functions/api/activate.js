@@ -8,12 +8,16 @@ import { verifyAttestation } from "../lib/attest.js";
 export async function finishActivation(env, lic, body) {
   const machineCode = body.machineCode;
 
-  // Attestation of the genuine app build is REQUIRED by default
-  // (owner's rule: one mismatch, no issuance — and no dashboard
-  // variable to remember). ATTEST_REQUIRED=0 in the dashboard is
-  // the only opt-out, back to verify-when-present.
+  // Attestation of the genuine app build: verified whenever a chain
+  // is presented, and a presented chain that fails is refused. It is
+  // NOT required by default: pre-2.0 clients cannot produce a chain
+  // at all, and the 2026-11-04 default-required experiment bricked
+  // every activation on the owner's own phone (1.9 and 2.0 alike —
+  // correctly diagnosed by him as a server-side problem). Required
+  // mode stays available as ATTEST_REQUIRED=1 for the day the fleet
+  // is fully on 2.0+.
   let integrity = null;
-  if (body.attestation || env.ATTEST_REQUIRED !== "0") {
+  if (body.attestation || env.ATTEST_REQUIRED === "1") {
     if (!body.attestation) return json({ ok: false, reason: "attest_missing" }, 403);
     const chal = await env.V2.get("chal:" + machineCode);
     if (!chal) return json({ ok: false, reason: "attest_no_challenge" }, 403);
