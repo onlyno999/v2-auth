@@ -23,6 +23,31 @@
   .muted { color: #889; font-size: 12px; }
   .hidden { display: none; }
   #msg { margin: 10px 0; color: #b03a2e; min-height: 18px; }
+
+  /* Mobile (<=640px): same stacked-card treatment as the admin
+     console — header row hides, each row becomes a bordered card of
+     label/value lines (labels from data-label in the row templates),
+     action buttons flow in a wrapping row, forms stack full-width.
+     Desktop rendering is untouched. */
+  @media (max-width: 640px) {
+    .wrap { padding: 14px 10px 40px; }
+    .card { padding: 12px; }
+    .row { flex-direction: column; align-items: stretch; }
+    .row input, .row select, .row button { width: 100% !important; min-width: 0 !important; flex: none !important; box-sizing: border-box; }
+    .code { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; font-size: 17px; }
+    .mono { overflow-wrap: anywhere; }
+    table, tbody, tr, td, th { display: block; width: 100%; box-sizing: border-box; }
+    thead { display: none; }
+    tbody tr { border: 1px solid #e2e5ec; border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
+    tbody tr:last-child { margin-bottom: 0; }
+    td { border-bottom: 0; padding: 3px 0; overflow-wrap: anywhere; }
+    td[data-label] { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+    td[data-label]::before { content: attr(data-label); flex: 0 0 60px; color: #889; font-size: 12px; }
+    tbody td:first-child { font-size: 14px; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px dashed #eceef2; }
+    tbody td[colspan] { border-bottom: 0; margin-bottom: 0; padding-bottom: 3px; }
+    td.acts { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; }
+    td.acts button.small { margin: 0; padding: 7px 12px; font-size: 13px; }
+  }
 </style>
 </head>
 <body>
@@ -198,10 +223,10 @@ async function loadDevices() {
   if (!data.devices.length) { $("tbody").innerHTML = '<tr><td colspan="5" class="muted">还没有客户</td></tr>'; return; }
   $("tbody").innerHTML = data.devices.map((d) => `<tr>
     <td class="mono">${d.machine}<div class="muted">${d.lic.note || ""}</div></td>
-    <td>${fmt(d.lic.activated_at)}</td>
-    <td>${d.lic.expires_at ? fmt(d.lic.expires_at) : "—"}</td>
-    <td>${fmt(d.last_seen)}</td>
-    <td>${d.lic.status}</td></tr>`).join("");
+    <td data-label="激活">${fmt(d.lic.activated_at)}</td>
+    <td data-label="到期">${d.lic.expires_at ? fmt(d.lic.expires_at) : "—"}</td>
+    <td data-label="最近打开">${fmt(d.last_seen)}</td>
+    <td data-label="状态">${d.lic.status}</td></tr>`).join("");
 }
 $("refreshBtn").onclick = loadDevices;
 
@@ -217,10 +242,10 @@ async function loadGuests() {
     const st = g.status === "disabled" ? "已停用" : (g.expired ? "已到期" : "正常");
     return `<tr>
     <td>${g.username}<div class="muted">${g.note || ""}</div></td>
-    <td class="mono">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
-    <td>${g.expires_at ? fmt(g.expires_at) : "—"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
-    <td>${st}</td>
-    <td>${g.status === "disabled"
+    <td class="mono" data-label="专属页面">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
+    <td data-label="到期">${g.expires_at ? fmt(g.expires_at) : "—"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
+    <td data-label="状态">${st}</td>
+    <td class="acts">${g.status === "disabled"
       ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>
          <button class="small danger" onclick="guestAct('${g.id}','delete')">删除</button>`
       : `<button class="small danger" onclick="guestAct('${g.id}','disable')">停用</button>`}

@@ -27,6 +27,31 @@
   .muted { color: #889; font-size: 12px; }
   .hidden { display: none; }
   #msg { margin: 10px 0; color: #b03a2e; min-height: 18px; }
+
+  /* Mobile (<=640px): tables turn into stacked cards — the header row
+     hides, each row becomes a bordered card whose cells render as
+     label/value lines (labels come from data-label in the row
+     templates), and action cells flow their buttons in a wrapping
+     row. Forms stack full-width. Desktop rendering is untouched. */
+  @media (max-width: 640px) {
+    .wrap { padding: 14px 10px 40px; }
+    .card { padding: 12px; }
+    .row { flex-direction: column; align-items: stretch; }
+    .row input, .row select, .row button { width: 100% !important; min-width: 0 !important; flex: none !important; box-sizing: border-box; }
+    .code { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; font-size: 17px; }
+    .mono { overflow-wrap: anywhere; }
+    table, tbody, tr, td, th { display: block; width: 100%; box-sizing: border-box; }
+    thead { display: none; }
+    tbody tr { border: 1px solid #e2e5ec; border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
+    tbody tr:last-child { margin-bottom: 0; }
+    td { border-bottom: 0; padding: 3px 0; overflow-wrap: anywhere; }
+    td[data-label] { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+    td[data-label]::before { content: attr(data-label); flex: 0 0 60px; color: #889; font-size: 12px; }
+    tbody td:first-child { font-size: 14px; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px dashed #eceef2; }
+    tbody td[colspan] { border-bottom: 0; margin-bottom: 0; padding-bottom: 3px; }
+    td.acts { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; }
+    td.acts button.small { margin: 0; padding: 7px 12px; font-size: 13px; }
+  }
 </style>
 </head>
 <body>
@@ -261,11 +286,11 @@ function renderIssued(list) {
   }
   $("issuedBody").innerHTML = list.map((i) => `<tr>
     <td class="mono">${i.machine || "—"}<div class="muted">${i.note || ""}</div></td>
-    <td>${i.duration_text || (i.days === 0 ? "永久" : i.days + " 天")}</td>
-    <td>${i.channel === "dist" ? "分销" + (i.dist ? "(" + i.dist + ")" : "") : "直营"}</td>
-    <td>${fmt(i.created_at)}</td>
-    <td>${i.status === "open" ? "已开通·待领取" : "未激活"}</td>
-    <td>${i.code ? `<button class="small ghost" onclick="copyIssued('${i.code}')">复制码</button> ` : ""}<button class="small danger" onclick="revokeCode('${i.licKey}')">作废</button></td></tr>`).join("");
+    <td data-label="天数">${i.duration_text || (i.days === 0 ? "永久" : i.days + " 天")}</td>
+    <td data-label="渠道">${i.channel === "dist" ? "分销" + (i.dist ? "(" + i.dist + ")" : "") : "直营"}</td>
+    <td data-label="发出时间">${fmt(i.created_at)}</td>
+    <td data-label="状态">${i.status === "open" ? "已开通·待领取" : "未激活"}</td>
+    <td class="acts">${i.code ? `<button class="small ghost" onclick="copyIssued('${i.code}')">复制码</button> ` : ""}<button class="small danger" onclick="revokeCode('${i.licKey}')">作废</button></td></tr>`).join("");
 }
 async function revokeCode(licKey) {
   if (!confirm("作废这个码？作废后客户就用不了了。")) return;
@@ -300,13 +325,13 @@ async function loadDevices() {
       ? '<div class="muted" style="color:#b03a2e">设备已解锁/root 标记</div>' : "";
     return `<tr>
       <td class="mono">${d.machine}<div class="muted">${lic.note || ""}${lic.channel === "dist" ? " · 分销" : ""}${lic.dist ? "(" + lic.dist + ")" : ""}</div>${boot}</td>
-      <td>${d.platform || "—"}</td>
-      <td>${fmt(lic.activated_at)}</td>
-      <td>${lic.expires_at ? fmt(lic.expires_at) : (lic.days === 0 ? "永久" : "—")}</td>
-      <td>${fmt(d.last_seen)}</td>
-      <td>${d.pulls}</td>
-      <td><span class="tag ${st === "revoked" ? "revoked" : st === "issued" ? "issued" : ""}">${st}</span></td>
-      <td>
+      <td data-label="平台">${d.platform || "—"}</td>
+      <td data-label="激活">${fmt(lic.activated_at)}</td>
+      <td data-label="到期">${lic.expires_at ? fmt(lic.expires_at) : (lic.days === 0 ? "永久" : "—")}</td>
+      <td data-label="最近打开">${fmt(d.last_seen)}</td>
+      <td data-label="拉取">${d.pulls}</td>
+      <td data-label="状态"><span class="tag ${st === "revoked" ? "revoked" : st === "issued" ? "issued" : ""}">${st}</span></td>
+      <td class="acts">
         ${st === "revoked"
           ? `<button class="small ghost" onclick="act('${d.machine}','restore')">恢复</button>`
           : `<button class="small danger" onclick="act('${d.machine}','revoke')">停用</button>`}
@@ -327,10 +352,10 @@ async function loadDists() {
   }
   $("distBody").innerHTML = data.distributors.map((d) => `<tr>
     <td class="mono">${d.slug}<div class="muted">${d.name || ""}</div></td>
-    <td class="mono">${location.origin}/${d.slug}</td>
-    <td>${d.used} / ${d.quota < 0 ? "不限" : d.quota}</td>
-    <td>${!d.has_pw ? "待他设密码" : (d.status === "active" ? "正常" : "已停用")}</td>
-    <td>${d.status === "active"
+    <td class="mono" data-label="登录地址">${location.origin}/${d.slug}</td>
+    <td data-label="额度">${d.used} / ${d.quota < 0 ? "不限" : d.quota}</td>
+    <td data-label="状态">${!d.has_pw ? "待他设密码" : (d.status === "active" ? "正常" : "已停用")}</td>
+    <td class="acts">${d.status === "active"
       ? `<button class="small danger" onclick="distAct('${d.slug}','disable')">停用</button>`
       : `<button class="small ghost" onclick="distAct('${d.slug}','enable')">恢复</button>
          <button class="small danger" onclick="distAct('${d.slug}','delete')">删除账户</button>`}
@@ -385,10 +410,10 @@ async function loadGuests() {
     const st = g.status === "disabled" ? "已停用" : (g.expired ? "已到期" : "正常");
     return `<tr>
     <td>${g.username}<div class="muted">${g.note || ""}${g.channel === "dist" ? " · 分销" : ""}${g.dist ? "(" + g.dist + ")" : ""}</div></td>
-    <td class="mono">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
-    <td>${g.expires_at ? fmt(g.expires_at) : "永久"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
-    <td>${st}</td>
-    <td>${g.status === "disabled"
+    <td class="mono" data-label="专属页面">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
+    <td data-label="到期">${g.expires_at ? fmt(g.expires_at) : "永久"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
+    <td data-label="状态">${st}</td>
+    <td class="acts">${g.status === "disabled"
       ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>
          <button class="small danger" onclick="guestAct('${g.id}','delete')">删除</button>`
       : `<button class="small danger" onclick="guestAct('${g.id}','disable')">停用</button>`}
