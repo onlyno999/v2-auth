@@ -285,7 +285,7 @@ function renderIssued(list) {
     return;
   }
   $("issuedBody").innerHTML = list.map((i) => `<tr>
-    <td class="mono">${i.machine || "—"}<div class="muted">${i.note || ""}</div>${i.attest_fail ? `<div style="color:#c62828">硬件证明被拒：${i.attest_fail.reason} · ${fmt(i.attest_fail.at)}</div>` : ""}</td>
+    <td class="mono">${i.machine || "—"}<div class="muted">${i.note || ""}</div>${i.attest_fail ? `<div style="color:#c62828">激活被拒：${i.attest_fail.reason} · ${fmt(i.attest_fail.at)}</div>` : ""}</td>
     <td data-label="天数">${i.duration_text || (i.days === 0 ? "永久" : i.days + " 天")}</td>
     <td data-label="渠道">${i.channel === "dist" ? "分销" + (i.dist ? "(" + i.dist + ")" : "") : "直营"}</td>
     <td data-label="发出时间">${fmt(i.created_at)}</td>

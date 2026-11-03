@@ -1,47 +1,33 @@
 import {
-  json, readJson, nowSec, sha256hex, b64Decode,
-  getLicByCode, putLic, putDev, licProblem, logEvent, newToken, durationSeconds,
+  json, readJson, nowSec, sha256hex,
+  getLicByCode, getDev, putLic, putDev, licProblem, logEvent, newToken, durationSeconds,
 } from "../lib/core.js";
-import { verifyAttestation } from "../lib/attest.js";
 
 // Shared activation tail: license is valid -> create device + token.
 export async function finishActivation(env, lic, body) {
   const machineCode = body.machineCode;
 
-  // Attestation of the genuine app build: verified whenever a chain
-  // is presented, and a presented chain that fails is refused. It is
-  // NOT required by default: pre-2.0 clients cannot produce a chain
-  // at all, and the 2026-11-04 default-required experiment bricked
-  // every activation on the owner's own phone (1.9 and 2.0 alike —
-  // correctly diagnosed by him as a server-side problem). Required
-  // mode stays available as ATTEST_REQUIRED=1 for the day the fleet
-  // is fully on 2.0+.
-  let integrity = null;
-  if (body.attestation || env.ATTEST_REQUIRED === "1") {
-    // Every attestation refusal is recorded where the seller can see
-    // it (admin console) — the app only shows a generic text.
-    const refuse = async (reason) => {
-      await logEvent(env, "attest_fail", machineCode, reason);
-      await env.V2.put("attestfail:" + machineCode,
-        JSON.stringify({ reason, at: nowSec() }), { expirationTtl: 7 * 86400 });
-      return json({ ok: false, reason }, 403);
-    };
-    if (!body.attestation) return refuse("attest_missing");
-    const chal = await env.V2.get("chal:" + machineCode);
-    if (!chal) return refuse("attest_no_challenge");
-    const verdict = await verifyAttestation(body.attestation.map((c) => b64Decode(c)), {
-      challenge: b64Decode(chal),
-      packageName: env.EXPECTED_PACKAGE || "com.v2ray.ang.fdroid",
-      // The genuine client builds are signed with the owner's personal
-      // certificate; its SHA-256 is public (printed on every APK), so
-      // it is safe as a built-in default. A repackaged build is signed
-      // with a different key and fails this check. Env can override.
-      certSha256Hex: env.EXPECTED_CERT_SHA256 || "221f4dd0cfef8b76785ffc82ada95b23961553927aadbcc920395fdbd119758a",
-      rootPinHex: env.ATTEST_ROOT_SHA256 || null,
-    });
-    if (!verdict.ok) return refuse(verdict.reason);
-    integrity = { boot: verdict.boot, root: verdict.rootHex, level: verdict.securityLevel };
-    await env.V2.delete("chal:" + machineCode);
+  // Build binding (owner's design, 2026-11-04, replacing Key
+  // Attestation chain verification): the client reports the SHA-256
+  // of its own signing certificate. The FIRST activation of a
+  // machine stores digest + machine code in KV; every later
+  // activation must present the same digest — a repackaged build is
+  // signed with another key and is refused. The per-machine random
+  // credential is the device token issued below; ordinary opens only
+  // validate that token and never re-check the build.
+  // (Chain verification was retired after its home-grown verifier
+  // rejected the owner's genuine 2.0 build with attest_chain_sig:
+  // reproduced locally with synthetic chains — the ECDSA scalar size
+  // was tied to the hash instead of the issuer curve, and the
+  // attestation OID constant had the wrong length byte, so no real
+  // chain could ever pass.)
+  const signer = typeof body.signer === "string" && body.signer ? body.signer.toLowerCase() : null;
+  const dev = await getDev(env, machineCode);
+  if (dev && dev.signer && signer !== dev.signer) {
+    await logEvent(env, "activate_fail", machineCode, "signer_mismatch");
+    await env.V2.put("attestfail:" + machineCode,
+      JSON.stringify({ reason: "signer_mismatch", at: nowSec() }), { expirationTtl: 7 * 86400 });
+    return json({ ok: false, reason: "signer_mismatch" }, 403);
   }
 
   const token = newToken();
@@ -55,10 +41,11 @@ export async function finishActivation(env, lic, body) {
     token_hash: await sha256hex(token),
     pubkey: body.pubkey || "",
     platform: body.platform || "",
+    signer: signer || (dev && dev.signer) || null,
     first_seen: nowSec(),
     last_seen: nowSec(),
     pulls: 0,
-    integrity,
+    integrity: null,
   });
   await logEvent(env, "activate", machineCode);
   return json({ ok: true, token, expires_at: expiresAt });
