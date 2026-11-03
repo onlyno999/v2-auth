@@ -267,20 +267,27 @@ export async function isAdmin(env, request) {
   // Session token arrives either as the sess cookie or as an x-session
   // header (the console stores it in localStorage too: some networks /
   // browsers drop cookies, and a refresh must not demand the password
-  // again while the token is still valid).
+  // again while the token is still valid). Try EVERY presented token:
+  // a stale cookie must not shadow a fresh header token — with
+  // cookie-first precedence, one old cookie locked the owner out of
+  // every console call (401s) even right after a password login,
+  // because the login page trusts the body token client-side while
+  // these checks kept verifying the dead cookie.
   const cookie = request.headers.get("cookie") || "";
   const m = cookie.match(/sess=([^;]+)/);
-  const token = (m && m[1]) || request.headers.get("x-session");
-  if (!token) return false;
-  const [payload, mac] = token.split(".");
-  if (!payload || !mac) return false;
-  if ((await hmac(env.SESSION_SECRET, payload)) !== mac) return false;
-  try {
-    const data = JSON.parse(new TextDecoder().decode(b64Decode(payload)));
-    return data.admin === true && data.exp > nowSec();
-  } catch {
-    return false;
+  const tokens = [m && m[1], request.headers.get("x-session")].filter(Boolean);
+  for (const token of tokens) {
+    const [payload, mac] = token.split(".");
+    if (!payload || !mac) continue;
+    if ((await hmac(env.SESSION_SECRET, payload)) !== mac) continue;
+    try {
+      const data = JSON.parse(new TextDecoder().decode(b64Decode(payload)));
+      if (data.admin === true && data.exp > nowSec()) return true;
+    } catch {
+      // try the next token
+    }
   }
+  return false;
 }
 
 export async function readJson(request) {
@@ -313,22 +320,27 @@ export async function distSessionCookie(env, slug) {
 }
 export async function distSlugFromRequest(env, request) {
   if (!env.SESSION_SECRET) return null;
+  // Try every presented token (cookie and header): a stale dsess
+  // cookie must not shadow a fresh x-dsess header token — same
+  // lockout bug as isAdmin.
   const cookie = request.headers.get("cookie") || "";
   const m = cookie.match(/dsess=([^;]+)/);
-  const token = (m && m[1]) || request.headers.get("x-dsess");
-  if (!token) return null;
-  const [payload, mac] = token.split(".");
-  if (!payload || !mac) return null;
-  if ((await hmac(env.SESSION_SECRET, payload)) !== mac) return null;
-  try {
-    const data = JSON.parse(new TextDecoder().decode(b64Decode(payload)));
-    if (!data.dist || data.exp <= nowSec()) return null;
-    const rec = await getDist(env, data.dist);
-    if (!rec || rec.status !== "active") return null;
-    return data.dist;
-  } catch {
-    return null;
+  const tokens = [m && m[1], request.headers.get("x-dsess")].filter(Boolean);
+  for (const token of tokens) {
+    const [payload, mac] = token.split(".");
+    if (!payload || !mac) continue;
+    if ((await hmac(env.SESSION_SECRET, payload)) !== mac) continue;
+    try {
+      const data = JSON.parse(new TextDecoder().decode(b64Decode(payload)));
+      if (!data.dist || data.exp <= nowSec()) continue;
+      const rec = await getDist(env, data.dist);
+      if (!rec || rec.status !== "active") continue;
+      return data.dist;
+    } catch {
+      // try the next token
+    }
   }
+  return null;
 }
 
 // ---------- guests ----------
