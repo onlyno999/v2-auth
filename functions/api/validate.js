@@ -15,5 +15,6 @@ export async function onRequestPost({ request, env }) {
     ok: true,
     expires_at: g.lic.expires_at ?? null,
     days_left: g.lic.expires_at ? Math.max(0, Math.floor((g.lic.expires_at - nowSec()) / 86400)) : null,
+    remain_sec: g.lic.expires_at ? Math.max(0, g.lic.expires_at - nowSec()) : null,
   });
 }

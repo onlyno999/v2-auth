@@ -127,6 +127,65 @@ export function licProblem(lic, machineCode) {
   return null;
 }
 
+// ---------- durations ----------
+// Records carry `days` (legacy whole-day field) plus, for sub-day
+// durations, `duration_sec` (exact seconds). Effective length:
+// duration_sec wins when present, else days*86400, else 0 = permanent.
+// Expiry is always computed in seconds, so a 5-minute license really
+// lives 300 seconds.
+export function durationSeconds(rec) {
+  if (rec && Number.isFinite(rec.duration_sec) && rec.duration_sec > 0) {
+    return Math.floor(rec.duration_sec);
+  }
+  if (rec && Number.isFinite(rec.days) && rec.days > 0) return Math.floor(rec.days) * 86400;
+  return 0;
+}
+export const DURATION_UNITS = { minute: 60, hour: 3600, day: 86400 };
+// Parse a duration from a request body. Preferred shape:
+// {durationValue, durationUnit: "minute"|"hour"|"day"} (minimum 60s).
+// Legacy fallback: {days: n} whole days (0 = permanent).
+// Returns seconds (>= 0), null = invalid, undefined = not provided.
+export function parseDurationSec(body) {
+  if (body.durationValue !== undefined || body.durationUnit !== undefined) {
+    const mult = DURATION_UNITS[body.durationUnit];
+    const v = Number(body.durationValue);
+    if (!mult || !Number.isFinite(v) || v <= 0) return null;
+    const sec = Math.floor(v) * mult;
+    if (sec < 60 || sec > 3650 * 86400) return null;
+    return sec;
+  }
+  if (body.days !== undefined) {
+    const d = Number(body.days);
+    if (!Number.isFinite(d) || d < 0 || Math.floor(d) !== d || d > 3650) return null;
+    return d * 86400;
+  }
+  return undefined;
+}
+// Signed delta version for "extend" calls: same shapes, but negative
+// values are allowed (used to shorten / force-expire in tests).
+// Returns delta seconds, null = invalid, 0 = nothing to add.
+export function parseDeltaSec(body) {
+  if (body.durationValue !== undefined || body.durationUnit !== undefined) {
+    const mult = DURATION_UNITS[body.durationUnit];
+    const v = Number(body.durationValue);
+    if (!mult || !Number.isFinite(v) || v === 0) return null;
+    return Math.floor(v) * mult;
+  }
+  const d = Math.floor(body.days || 0);
+  return d * 86400;
+}
+// Human label for a duration in seconds — never rounds 5 minutes
+// down to "0 天".
+export function fmtDuration(sec) {
+  if (!sec || sec <= 0) return "永久";
+  if (sec < 3600) return `${Math.round(sec / 60)}分钟`;
+  if (sec < 86400) return Number.isInteger(sec / 3600) ? `${sec / 3600}小时` : `${Math.round(sec / 60)}分钟`;
+  if (sec % 86400 === 0) return `${sec / 86400}天`;
+  const d = Math.floor(sec / 86400);
+  const h = Math.round((sec % 86400) / 3600);
+  return h ? `${d}天${h}小时` : `${d}天`;
+}
+
 // ---------- request signature (device key, ES256) ----------
 // Canonical string signed by the device private key (Android Keystore):
 //   `${machineCode}|${ts}|${nonce}|${path}`
@@ -229,7 +288,7 @@ export async function putDist(env, slug, rec) {
   await env.V2.put("dist:" + slug, JSON.stringify(rec));
 }
 export const SLUG_RE = /^[a-z0-9][a-z0-9_-]{1,23}$/;
-export const RESERVED_SLUGS = new Set(["api", "index", "dist", "admin", "assets", "guest", "s"]);
+export const RESERVED_SLUGS = new Set(["api", "index", "dist", "admin", "assets", "guest", "s", "g"]);
 
 export async function distSessionCookie(env, slug) {
   const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 24 * 30, dist: slug })));
@@ -251,6 +310,67 @@ export async function distSlugFromRequest(env, request) {
     const rec = await getDist(env, data.dist);
     if (!rec || rec.status !== "active") return null;
     return data.dist;
+  } catch {
+    return null;
+  }
+}
+
+// ---------- guests ----------
+// KV: gst:<id> -> {username, pw_hash, note, days, status, created_at,
+//   expires_at, sealed}
+// Guests are customers on third-party clients (Shadowrocket & co).
+// The admin creates them by hand in the console — username + password
+// + validity — and manages them like distributors (disable / enable /
+// extend / password / delete). Each guest has a personal page at
+// /g/<id>: it shows nothing but a password box until he logs in, then
+// only his remaining time and his sealed personal subscription link
+// (/s/<token>) to copy. The real subscription URL never leaves the
+// server, and /s/ re-checks this record on every fetch, so disabling,
+// deleting or expiring the guest cuts the link at once.
+export async function getGuest(env, id) {
+  if (!id) return null;
+  const raw = await env.V2.get("gst:" + id);
+  return raw ? JSON.parse(raw) : null;
+}
+export async function putGuest(env, id, rec) {
+  await env.V2.put("gst:" + id, JSON.stringify(rec));
+}
+export function newGuestId() {
+  const rnd = new Uint8Array(12);
+  crypto.getRandomValues(rnd);
+  return [...rnd].map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length].toLowerCase()).join("");
+}
+export function guestProblem(rec) {
+  if (!rec) return "not_found";
+  if (rec.status === "disabled") return "disabled";
+  if (rec.expires_at && nowSec() > rec.expires_at) return "expired";
+  return null;
+}
+
+export async function guestSessionCookie(env, id) {
+  const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 24 * 30, gst: id })));
+  const mac = await hmac(env.SESSION_SECRET, payload);
+  return `${payload}.${mac}`;
+}
+// Returns the guest id for a valid session whose account is still
+// usable (exists, not disabled, not expired); otherwise null. The
+// record is re-read on every call, so an admin disable kills live
+// sessions immediately.
+export async function guestIdFromRequest(env, request) {
+  if (!env.SESSION_SECRET) return null;
+  const cookie = request.headers.get("cookie") || "";
+  const m = cookie.match(/gsess=([^;]+)/);
+  const token = (m && m[1]) || request.headers.get("x-gsess");
+  if (!token) return null;
+  const [payload, mac] = token.split(".");
+  if (!payload || !mac) return null;
+  if ((await hmac(env.SESSION_SECRET, payload)) !== mac) return null;
+  try {
+    const data = JSON.parse(new TextDecoder().decode(b64Decode(payload)));
+    if (!data.gst || data.exp <= nowSec()) return null;
+    const rec = await getGuest(env, data.gst);
+    if (guestProblem(rec)) return null;
+    return data.gst;
   } catch {
     return null;
   }

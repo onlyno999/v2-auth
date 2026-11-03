@@ -1,20 +1,29 @@
 import {
   json, readJson, nowSec, isAdmin, newLicenseCode, codeKey, logEvent, vaultSeal,
+  parseDurationSec, durationSeconds, fmtDuration,
 } from "../../lib/core.js";
 
-// POST {machineCode, days, note, mode: "code"|"open"}  (admin)
-// mode "code": returns a license code pre-bound to the machine.
-// mode "open": direct-open — the user claims it from the app.
+// POST {machineCode, days | durationValue+durationUnit, note,
+//       mode: "code"|"open", channel}  (admin)
+// Duration accepts minute-level values (min 1 minute) via
+// durationValue/durationUnit, or the legacy whole-{days} field
+// (0 = permanent). mode "code": returns a license code pre-bound to
+// the machine. mode "open": direct-open — the user claims it.
 export async function onRequestPost({ request, env }) {
   if (!(await isAdmin(env, request))) return json({ ok: false, reason: "unauthorized" }, 401);
   const body = await readJson(request);
   if (!body.machineCode) return json({ ok: false, reason: "no_machine" }, 400);
-  const days = Number.isFinite(body.days) ? Math.max(0, Math.floor(body.days)) : 30;
+  let sec = parseDurationSec(body);
+  if (sec === null) return json({ ok: false, reason: "bad_duration" }, 400);
+  if (sec === undefined) sec = 30 * 86400;
   const code = newLicenseCode();
   const key = await codeKey(code);
   const mode = body.mode === "open" ? "open" : "code";
   const rec = {
-    days,
+    // `days` stays as a coarse compatibility field (ceil); the exact
+    // length lives in duration_sec and rules the real expiry.
+    days: sec ? Math.ceil(sec / 86400) : 0,
+    duration_sec: sec || null,
     status: mode === "open" ? "open" : "issued",
     machine: body.machineCode,
     note: body.note || "",
@@ -27,9 +36,9 @@ export async function onRequestPost({ request, env }) {
   await env.V2.put(key, JSON.stringify(rec));
   if (mode === "open") {
     await env.V2.put("open:" + body.machineCode, key);
-    await logEvent(env, "admin_open", body.machineCode, `${days}d`);
+    await logEvent(env, "admin_open", body.machineCode, fmtDuration(durationSeconds(rec)));
     return json({ ok: true, mode });
   }
-  await logEvent(env, "admin_issue", body.machineCode, `${days}d`);
+  await logEvent(env, "admin_issue", body.machineCode, fmtDuration(durationSeconds(rec)));
   return json({ ok: true, mode, code });
 }

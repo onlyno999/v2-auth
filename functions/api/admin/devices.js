@@ -1,4 +1,4 @@
-import { json, isAdmin, vaultOpen } from "../../lib/core.js";
+import { json, isAdmin, vaultOpen, durationSeconds, fmtDuration } from "../../lib/core.js";
 
 // Fetch every key under a prefix (paged).
 async function listKeys(env, prefix) {
@@ -48,6 +48,8 @@ export async function onRequestGet({ request, env }) {
       lic: lic
         ? {
             status: lic.status, days: lic.days, note: lic.note || "",
+            duration_sec: lic.duration_sec ?? null,
+            duration_text: fmtDuration(durationSeconds(lic)),
             channel: lic.channel || "main", dist: lic.dist || null,
             created_at: lic.created_at, activated_at: lic.activated_at,
             expires_at: lic.expires_at,
@@ -63,6 +65,8 @@ export async function onRequestGet({ request, env }) {
       issuedRaw.push({
         licKey: k,
         machine: lic.machine, note: lic.note || "", days: lic.days,
+        duration_sec: lic.duration_sec ?? null,
+        duration_text: fmtDuration(durationSeconds(lic)),
         channel: lic.channel || "main", dist: lic.dist || null,
         status: lic.status, created_at: lic.created_at,
         code_enc: lic.code_enc || null,

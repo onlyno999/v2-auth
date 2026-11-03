@@ -1,13 +1,14 @@
-import { getLicByKey, licProblem, vaultOpen, logEvent } from "../lib/core.js";
+import { getGuest, guestProblem, vaultOpen, logEvent } from "../lib/core.js";
 import { serveSubscription } from "../api/subscription.js";
 
 // GET /s/<sealed-token>
-// The personal subscription link handed out by /api/guest/link (and
-// pasted into Shadowrocket or any other client as a subscription URL).
-// The token is an opaque AES-GCM sealed license reference; every fetch
-// re-checks the license, so revoking, deleting or expiring the license
-// in the console kills the link immediately. Serves exactly the same
-// content as the app channel, via the same lazy KV cache.
+// A guest's personal subscription link, pasted into Shadowrocket or
+// any other third-party client as a subscription URL. The token is an
+// opaque AES-GCM sealed guest reference, minted when the admin
+// created the guest; the real subscription URL never leaves the
+// server. Every fetch re-reads the guest record, so the moment the
+// admin disables or deletes the guest — or his time runs out — this
+// link stops serving subscription data; re-enabling revives it.
 export async function onRequestGet({ request, env, params }) {
   const deny = (reason, status = 403) =>
     new Response(JSON.stringify({ ok: false, reason }), {
@@ -21,18 +22,17 @@ export async function onRequestGet({ request, env, params }) {
   } catch {
     payload = null;
   }
-  if (!payload || !payload.k) return deny("bad_link", 404);
+  if (!payload || !payload.g) return deny("bad_link", 404);
 
-  const lic = await getLicByKey(env, payload.k);
-  if (!lic) return deny("not_found", 404);
-  const problem = licProblem(lic, lic.machine);
+  const rec = await getGuest(env, payload.g);
+  if (!rec) return deny("not_found", 404);
+  const problem = guestProblem(rec);
   if (problem) {
-    await logEvent(env, "guest_sub_deny", lic.machine || "", problem);
+    await logEvent(env, "guest_sub_deny", rec.username || "", problem);
     return deny(problem);
   }
-  if (lic.status !== "active") return deny("not_active");
 
-  const content = await serveSubscription(env, lic.channel === "dist" ? "dist" : "main");
+  const content = await serveSubscription(env, "main");
   if (!content) return deny("sub_unavailable", 502);
   return new Response(content, {
     status: 200,

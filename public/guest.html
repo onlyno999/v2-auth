@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>获取我的订阅链接</title>
+<title>我的订阅</title>
 <style>
   body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; background: #f4f5f7; color: #1c2333; }
   .wrap { max-width: 640px; margin: 0 auto; padding: 28px 16px 48px; }
@@ -14,6 +14,7 @@
   button.ghost { background: #e8ebf0; color: #1c2333; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
   .link { font-family: ui-monospace, Consolas, monospace; font-size: 13px; word-break: break-all; background: #fff8e6; border: 1px dashed #d9a441; padding: 10px 12px; border-radius: 8px; }
+  .big { font-size: 17px; font-weight: 600; }
   .muted { color: #889; font-size: 13px; line-height: 1.7; }
   #msg { margin: 10px 0; color: #b03a2e; min-height: 18px; }
   .hidden { display: none; }
@@ -21,67 +22,98 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>获取我的订阅链接</h1>
-  <div class="muted">把卖家给你的激活码粘贴到下面，就能拿到你自己的专属订阅链接。把链接粘贴到小火箭（Shadowrocket）等软件的订阅里，就能导入节点。</div>
+  <h1>我的订阅</h1>
 
-  <div class="card" style="margin-top:14px">
-    <input id="code" placeholder="在此粘贴激活码（V2O- 开头）" autocomplete="off">
+  <div id="loginBox" class="card">
+    <div class="muted">输入卖家给你的密码登录。</div>
+    <div style="margin-top:10px">
+      <input id="pw" type="password" placeholder="密码" autocomplete="current-password">
+    </div>
     <div class="row">
-      <button id="goBtn">获取订阅链接</button>
+      <button id="loginBtn">登录</button>
     </div>
     <div id="msg"></div>
-    <div id="result" class="hidden">
-      <div class="link" id="linkText"></div>
-      <div class="row">
-        <button id="copyBtn" class="ghost">复制链接</button>
-        <span class="muted" id="expText"></span>
-      </div>
-      <div class="muted" style="margin-top:10px">
-        使用方法（小火箭）：打开小火箭 → 右上角 + → 类型选 Subscribe（订阅）→ 把上面的链接粘贴到 URL 里 → 完成。以后节点更新，在小火箭里点订阅更新即可，不用再来这里。<br>
-        注意：这个链接只属于你一个人，别转发给别人；卖家停用或到期后，链接会自动失效。
-      </div>
+  </div>
+
+  <div id="panel" class="card hidden">
+    <div class="big" id="remainText"></div>
+    <div class="muted" id="expText"></div>
+    <div style="margin-top:14px" class="muted">我的专属订阅链接（粘贴到小火箭等软件的订阅里使用）：</div>
+    <div class="link" id="linkText" style="margin-top:6px"></div>
+    <div class="row">
+      <button id="copyBtn" class="ghost">复制链接</button>
+    </div>
+    <div class="muted" style="margin-top:10px">
+      使用方法（小火箭）：打开小火箭 → 右上角 + → 类型选 Subscribe（订阅）→ 把上面的链接粘贴到 URL 里 → 完成。以后节点更新，在小火箭里点订阅更新即可。<br>
+      这个链接只属于你一个人，别转发给别人；停用或到期后链接会自动失效。
     </div>
   </div>
 </div>
 
 <script>
 const $ = (id) => document.getElementById(id);
+const gid = (location.pathname.match(/^\/g\/(.+)$/) || [])[1] || "";
 const REASONS = {
-  not_found: "激活码不对，检查一下有没有粘错",
-  bad_request: "先粘贴激活码",
-  revoked: "这个激活码已被停用，请联系卖家",
-  expired: "这个激活码已过期，请联系卖家续期",
-  not_issued: "这个激活码还不能用，请联系卖家",
-  bound_other: "激活码与账号不匹配，请联系卖家",
+  bad_password: "密码不对",
+  disabled: "账号已停用，请联系卖家",
+  expired: "已到期，请联系卖家续期",
+  not_found: "账号不存在，请确认打开的链接对不对",
   rate_limited: "试得太多了，过一会儿再来",
 };
-$("goBtn").onclick = async () => {
-  const code = $("code").value.trim();
+const sess = () => { try { return localStorage.getItem("v2gsess"); } catch { return null; } };
+
+async function loadMe() {
+  const s = sess();
+  const r = await fetch("/api/guest/me", { headers: s ? { "x-gsess": s } : {} });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 200 && data.ok) {
+    if (!data.expires_at) {
+      $("remainText").textContent = "永久有效";
+    } else if (data.remain_sec !== null && data.remain_sec !== undefined && data.remain_sec < 3600) {
+      $("remainText").textContent = `还剩 ${Math.max(1, data.minutes_left)} 分钟`;
+    } else if (data.remain_sec !== null && data.remain_sec !== undefined && data.remain_sec < 86400) {
+      const h = Math.floor(data.remain_sec / 3600);
+      const m = Math.ceil((data.remain_sec % 3600) / 60);
+      $("remainText").textContent = `还剩 ${h} 小时 ${m} 分钟`;
+    } else {
+      $("remainText").textContent = `还剩 ${data.days_left} 天`;
+    }
+    $("expText").textContent = data.expires_at
+      ? "到期时间：" + new Date(data.expires_at * 1000).toLocaleString("zh-CN", { hour12: false })
+      : "";
+    $("linkText").textContent = data.link;
+    $("loginBox").classList.add("hidden");
+    $("panel").classList.remove("hidden");
+    return true;
+  }
+  return false;
+}
+(async () => { if (sess()) await loadMe(); })();
+
+async function doLogin() {
   $("msg").textContent = "";
-  $("result").classList.add("hidden");
-  if (!code) { $("msg").textContent = REASONS.bad_request; return; }
-  $("goBtn").disabled = true;
+  if (!gid) { $("msg").textContent = REASONS.not_found; return; }
+  $("loginBtn").disabled = true;
   try {
-    const r = await fetch("/api/guest/link", {
+    const r = await fetch("/api/guest/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ id: gid, password: $("pw").value }),
     });
     const data = await r.json().catch(() => ({}));
-    if (data.ok && data.link) {
-      $("linkText").textContent = data.link;
-      $("expText").textContent = data.expires_at
-        ? "到期时间：" + new Date(data.expires_at * 1000).toLocaleString("zh-CN", { hour12: false })
-        : "永久有效";
-      $("result").classList.remove("hidden");
+    if (r.status === 200 && data.ok) {
+      if (data.session) { try { localStorage.setItem("v2gsess", data.session); } catch {} }
+      if (!(await loadMe())) $("msg").textContent = "登录状态异常，请刷新重试";
     } else {
       $("msg").textContent = REASONS[data.reason] || ("失败：" + (data.reason || "未知错误"));
     }
   } catch (e) {
     $("msg").textContent = "网络连接失败，请检查网络后重试";
   }
-  $("goBtn").disabled = false;
-};
+  $("loginBtn").disabled = false;
+}
+$("loginBtn").onclick = doLogin;
+$("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 $("copyBtn").onclick = async () => {
   const text = $("linkText").textContent;
   try { await navigator.clipboard.writeText(text); $("copyBtn").textContent = "已复制"; }

@@ -1,5 +1,5 @@
 import {
-  json, readJson, nowSec, isAdmin, getDev, getLicByKey, putLic, logEvent,
+  json, readJson, nowSec, isAdmin, getDev, getLicByKey, putLic, logEvent, parseDeltaSec,
 } from "../../lib/core.js";
 
 // POST {machineCode, action: revoke|restore|unbind|extend, days?}  (admin)
@@ -61,10 +61,12 @@ export async function onRequestPost({ request, env }) {
     case "extend": {
       if (!lic) return json({ ok: false, reason: "not_found" }, 404);
       if (!lic.expires_at) return json({ ok: false, reason: "permanent" }, 400);
-      const add = Math.floor(body.days || 0);
-      await putLic(env, { ...lic, expires_at: lic.expires_at + add * 86400 });
-      await logEvent(env, "admin_extend", machine, `${add}d`);
-      return json({ ok: true, expires_at: lic.expires_at + add * 86400, now: nowSec() });
+      const deltaSec = parseDeltaSec(body);
+      if (deltaSec === null) return json({ ok: false, reason: "bad_duration" }, 400);
+      const expires_at = lic.expires_at + deltaSec;
+      await putLic(env, { ...lic, expires_at });
+      await logEvent(env, "admin_extend", machine, `${deltaSec}s`);
+      return json({ ok: true, expires_at, now: nowSec() });
     }
     default:
       return json({ ok: false, reason: "bad_action" }, 400);

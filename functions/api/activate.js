@@ -1,6 +1,6 @@
 import {
   json, readJson, nowSec, sha256hex, b64Decode,
-  getLicByCode, putLic, putDev, licProblem, logEvent, newToken,
+  getLicByCode, putLic, putDev, licProblem, logEvent, newToken, durationSeconds,
 } from "../lib/core.js";
 import { verifyAttestation } from "../lib/attest.js";
 
@@ -30,7 +30,8 @@ export async function finishActivation(env, lic, body) {
 
   const token = newToken();
   const activatedAt = lic.activated_at || nowSec();
-  const expiresAt = lic.expires_at ?? (lic.days ? activatedAt + lic.days * 86400 : null);
+  const durSec = durationSeconds(lic);
+  const expiresAt = lic.expires_at ?? (durSec ? activatedAt + durSec : null);
   const newLic = { ...lic, status: "active", activated_at: activatedAt, expires_at: expiresAt };
   await putLic(env, newLic);
   await putDev(env, machineCode, {

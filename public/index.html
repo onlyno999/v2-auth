@@ -46,12 +46,12 @@
     <div class="card">
       <div class="row">
         <input id="mc" placeholder="用户的机器码" style="flex:2;min-width:220px" class="mono">
-        <select id="days">
-          <option value="30">30 天</option>
-          <option value="90">90 天</option>
-          <option value="180">180 天</option>
-          <option value="365" selected>365 天</option>
-          <option value="0">永久</option>
+        <input id="durVal" type="number" min="1" value="365" style="width:90px">
+        <select id="durUnit">
+          <option value="minute">分钟</option>
+          <option value="hour">小时</option>
+          <option value="day" selected>天</option>
+          <option value="perm">永久</option>
         </select>
         <select id="channel">
           <option value="main" selected>直营</option>
@@ -108,6 +108,29 @@
         <tbody id="distBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
       </table>
     </div>
+
+    <h2>游客客户（小火箭等第三方客户端）</h2>
+    <div class="card">
+      <div class="row">
+        <input id="guser" placeholder="用户名（客户名）" style="width:150px">
+        <input id="gpw" placeholder="密码（至少 6 位）" style="width:170px">
+        <input id="gdurVal" type="number" min="1" value="365" style="width:80px">
+        <select id="gdurUnit">
+          <option value="minute">分钟</option>
+          <option value="hour">小时</option>
+          <option value="day" selected>天</option>
+          <option value="perm">永久</option>
+        </select>
+        <input id="gnote" placeholder="备注（可空）" style="width:140px">
+        <button id="guestCreateBtn">添加游客</button>
+        <span id="guestMsg" class="muted"></span>
+      </div>
+      <div class="muted" style="margin:8px 0">添加后把「专属页面」链接发给客户：他打开先输密码，进去只能看到自己还剩多少天、复制他自己的订阅链接，真实订阅地址不显示。停用 / 到期后他的订阅链接立刻失效；删除要先停用。</div>
+      <table>
+        <thead><tr><th>用户名 / 备注</th><th>专属页面</th><th>到期</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="guestBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -141,6 +164,7 @@ function enterConsole() {
   $("console").classList.remove("hidden");
   loadDevices();
   loadDists();
+  loadGuests();
 }
 async function doLogin() {
   const { status, data } = await api("/api/admin/login", {
@@ -162,8 +186,13 @@ $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); }
   if (data && data.ok) enterConsole();
 })();
 
+function durFields(valId, unitId) {
+  const unit = $(unitId).value;
+  if (unit === "perm") return { days: 0 };
+  return { durationValue: Number($(valId).value || 0), durationUnit: unit };
+}
 $("issueBtn").onclick = async () => {
-  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), channel: $("channel").value, mode: "code" };
+  const body = { machineCode: $("mc").value.trim(), ...durFields("durVal", "durUnit"), note: $("note").value.trim(), channel: $("channel").value, mode: "code" };
   if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
   const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
   if (data.ok) {
@@ -173,7 +202,7 @@ $("issueBtn").onclick = async () => {
   } else $("issueMsg").textContent = "失败：" + (data.reason || "");
 };
 $("openBtn").onclick = async () => {
-  const body = { machineCode: $("mc").value.trim(), days: Number($("days").value), note: $("note").value.trim(), channel: $("channel").value, mode: "open" };
+  const body = { machineCode: $("mc").value.trim(), ...durFields("durVal", "durUnit"), note: $("note").value.trim(), channel: $("channel").value, mode: "open" };
   if (!body.machineCode) { $("issueMsg").textContent = "先填机器码"; return; }
   const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
   $("issueMsg").textContent = data.ok ? "已开通：让用户在客户端点「我已付款」即可进入" : "失败：" + (data.reason || "");
@@ -196,7 +225,7 @@ function renderIssued(list) {
   }
   $("issuedBody").innerHTML = list.map((i) => `<tr>
     <td class="mono">${i.machine || "—"}<div class="muted">${i.note || ""}</div></td>
-    <td>${i.days === 0 ? "永久" : i.days + " 天"}</td>
+    <td>${i.duration_text || (i.days === 0 ? "永久" : i.days + " 天")}</td>
     <td>${i.channel === "dist" ? "分销" + (i.dist ? "(" + i.dist + ")" : "") : "直营"}</td>
     <td>${fmt(i.created_at)}</td>
     <td>${i.status === "open" ? "已开通·待领取" : "未激活"}</td>
@@ -306,6 +335,69 @@ $("distCreateBtn").onclick = async () => {
     ? `已添加：他的登录地址 ${location.origin}/${body.slug}`
     : "失败：" + (data.reason || "");
   if (data.ok) loadDists();
+};
+
+async function loadGuests() {
+  const { data } = await api("/api/admin/guest");
+  if (!data.ok) { $("guestBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
+  if (!data.guests.length) {
+    $("guestBody").innerHTML = '<tr><td colspan="5" class="muted">还没有游客客户</td></tr>';
+    return;
+  }
+  $("guestBody").innerHTML = data.guests.map((g) => {
+    const page = `${location.origin}/g/${g.id}`;
+    const st = g.status === "disabled" ? "已停用" : (g.expired ? "已到期" : "正常");
+    return `<tr>
+    <td>${g.username}<div class="muted">${g.note || ""}</div></td>
+    <td class="mono">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
+    <td>${g.expires_at ? fmt(g.expires_at) : "永久"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
+    <td>${st}</td>
+    <td>${g.status === "disabled"
+      ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>
+         <button class="small danger" onclick="guestAct('${g.id}','delete')">删除</button>`
+      : `<button class="small danger" onclick="guestAct('${g.id}','disable')">停用</button>`}
+      <button class="small ghost" onclick="guestAct('${g.id}','extend')">延期</button>
+      <button class="small ghost" onclick="guestAct('${g.id}','password')">改密码</button></td></tr>`;
+  }).join("");
+}
+async function copyGuestPage(page) {
+  try { await navigator.clipboard.writeText(page); alert("已复制专属页面链接：" + page); }
+  catch { prompt("复制这个链接发给客户：", page); }
+}
+window.copyGuestPage = copyGuestPage;
+async function guestAct(id, action) {
+  const body = { id, action };
+  if (action === "delete" && !confirm("彻底删除这个游客客户？他的专属页面和订阅链接立即失效、不可恢复。")) return;
+  if (action === "extend") {
+    const d = prompt("延期天数（可负数）：", "30");
+    if (d === null || d === "") return;
+    body.days = Number(d);
+  }
+  if (action === "password") {
+    const p = prompt("给他设置新密码（至少 6 位）：");
+    if (p === null || p === "") return;
+    body.password = p;
+  }
+  const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify(body) });
+  if (!data.ok) alert("失败：" + (data.reason === "disable_first" ? "先停用才能删除" : data.reason || ""));
+  loadGuests();
+}
+window.guestAct = guestAct;
+$("guestCreateBtn").onclick = async () => {
+  const body = {
+    action: "create",
+    username: $("guser").value.trim(),
+    password: $("gpw").value,
+    ...durFields("gdurVal", "gdurUnit"),
+    note: $("gnote").value.trim(),
+  };
+  if (!body.username) { $("guestMsg").textContent = "用户名必填"; return; }
+  if (!body.password) { $("guestMsg").textContent = "密码必填（至少 6 位）"; return; }
+  const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify(body) });
+  $("guestMsg").textContent = data.ok
+    ? `已添加：把 ${location.origin}${data.path} 发给客户`
+    : "失败：" + (data.reason === "exists" ? "用户名已存在" : data.reason || "");
+  if (data.ok) loadGuests();
 };
 </script>
 </body>

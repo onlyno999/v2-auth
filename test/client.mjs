@@ -240,23 +240,109 @@ check("device deleted from table", delDev.status === 200 && !(afterDel.devices |
 const valAfterDel = await j("/api/validate", { machineCode: M1, token: act1.data.token });
 check("validate denied after device delete", valAfterDel.status === 403);
 
-// ---- guest subscription link (Shadowrocket etc.) ----
-const gIssue = await j("/api/admin/issue", { machineCode: "GUEST-USER-001", days: 30, note: "小火箭客户", mode: "code" }, { cookie });
-const gLink = await j("/api/guest/link", { code: gIssue.data.code });
-check("guest link issued", gLink.status === 200 && typeof gLink.data.link === "string" && gLink.data.link.includes("/s/"), JSON.stringify(gLink.data).slice(0, 90));
-const gFetch = await fetch(gLink.data.link);
-const gBody = await gFetch.text();
+// ---- guest customers (admin-managed; /g/<id> page + sealed link) ----
 const expectedSub = readFileSync(new URL("./fixtures/sub_main.txt", import.meta.url), "utf8");
-check("guest link serves subscription content", gFetch.status === 200 && gBody === expectedSub, gBody.slice(0, 40));
-const gTable = await (await fetch(BASE + "/api/admin/devices", { headers: { cookie } })).json();
-check("guest customer visible in device table", (gTable.devices || []).some((d) => d.machine === "GUEST-USER-001" && d.lic && d.lic.status === "active"));
-const gBad = await fetch(BASE + "/s/AAAAbbbbCCCCdddd");
-check("tampered guest link rejected", gBad.status === 404);
-const gWrongCode = await j("/api/guest/link", { code: "V2O-XXXXX-XXXXX-XXXXX-XXXXX" });
-check("guest link with unknown code rejected", gWrongCode.status === 404);
-await j("/api/admin/action", { machineCode: "GUEST-USER-001", action: "revoke" }, { cookie });
-const gAfterRevoke = await fetch(gLink.data.link);
-check("guest link dead after revoke", gAfterRevoke.status === 403);
+const gNoAuth = await j("/api/admin/guest", { action: "create", username: "x", password: "guest-pw-1", days: 30 });
+check("guest admin api requires login", gNoAuth.status === 401);
+const gCreate = await j("/api/admin/guest", { action: "create", username: "小火箭阿强", password: "guest-pw-1", days: 30, note: "游客甲" }, { cookie });
+check("admin creates guest", gCreate.status === 200 && !!gCreate.data.id && gCreate.data.path === "/g/" + gCreate.data.id, JSON.stringify(gCreate.data).slice(0, 90));
+const GID = gCreate.data.id;
+const gDup = await j("/api/admin/guest", { action: "create", username: "小火箭阿强", password: "guest-pw-2", days: 30 }, { cookie });
+check("duplicate guest username rejected", gDup.status === 409);
+const gWeak = await j("/api/admin/guest", { action: "create", username: "弱口令游客", password: "123", days: 30 }, { cookie });
+check("weak guest password rejected", gWeak.status === 400);
+const gList = await (await fetch(BASE + "/api/admin/guest", { headers: { cookie } })).json();
+check("guest listed for admin", gList.ok === true && (gList.guests || []).some((g) => g.id === GID && g.username === "小火箭阿强" && !("pw_hash" in g)));
+const gPage = await fetch(BASE + "/g/" + GID);
+const gPageHtml = await gPage.text();
+check("guest page pre-login shows password box only", gPage.status === 200 && gPageHtml.includes('id="pw"') && !gPageHtml.includes("/s/"));
+check("unknown guest page 404s", (await fetch(BASE + "/g/zzzzzzzzzzzz")).status === 404);
+const gOldEndpoint = await j("/api/guest/link", { code: "whatever" });
+check("old code-exchange endpoint gone", gOldEndpoint.status === 404 || gOldEndpoint.status === 405);
+const gMeAnon = await fetch(BASE + "/api/guest/me");
+check("guest me requires login", gMeAnon.status === 401);
+const gBadPw = await j("/api/guest/login", { id: GID, password: "nope-nope" });
+check("guest bad password rejected", gBadPw.status === 401 && gBadPw.data.reason === "bad_password");
+const gLoginRes = await fetch(BASE + "/api/guest/login", {
+  method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ id: GID, password: "guest-pw-1" }),
+});
+const gcookie = (gLoginRes.headers.get("set-cookie") || "").split(";")[0];
+check("guest login ok", gLoginRes.status === 200 && gcookie.startsWith("gsess="));
+const gMe = await (await fetch(BASE + "/api/guest/me", { headers: { cookie: gcookie } })).json();
+check("guest me: remaining time + sealed link only, no real address",
+  gMe.ok === true && gMe.username === "小火箭阿强" && gMe.days_left >= 29 && gMe.days_left <= 30 &&
+  typeof gMe.link === "string" && gMe.link.includes("/s/") && !JSON.stringify(gMe).includes("8899"),
+  JSON.stringify(gMe).slice(0, 110));
+const gFetch = await fetch(gMe.link);
+check("guest link serves subscription content", gFetch.status === 200 && (await gFetch.text()) === expectedSub);
+check("tampered guest link rejected", (await fetch(BASE + "/s/AAAAbbbbCCCCdddd")).status === 404);
+await j("/api/admin/guest", { id: GID, action: "disable" }, { cookie });
+check("guest link dead after disable", (await fetch(gMe.link)).status === 403);
+const gLoginOff = await j("/api/guest/login", { id: GID, password: "guest-pw-1" });
+check("disabled guest cannot log in", gLoginOff.status === 403 && gLoginOff.data.reason === "disabled");
+const gMeOff = await fetch(BASE + "/api/guest/me", { headers: { cookie: gcookie } });
+check("disabled guest session rejected", gMeOff.status === 401);
+await j("/api/admin/guest", { id: GID, action: "enable" }, { cookie });
+check("guest link back after enable", (await fetch(gMe.link)).status === 200);
+await j("/api/admin/guest", { id: GID, action: "extend", days: -10000 }, { cookie });
+check("expired guest link dead", (await fetch(gMe.link)).status === 403);
+await j("/api/admin/guest", { id: GID, action: "extend", days: 10001 }, { cookie });
+check("extended guest link alive again", (await fetch(gMe.link)).status === 200);
+await j("/api/admin/guest", { id: GID, action: "password", password: "guest-pw-9" }, { cookie });
+check("old guest password dead after change", (await j("/api/guest/login", { id: GID, password: "guest-pw-1" })).status === 401);
+check("new guest password works", (await j("/api/guest/login", { id: GID, password: "guest-pw-9" })).status === 200);
+const gDelActive = await j("/api/admin/guest", { id: GID, action: "delete" }, { cookie });
+check("delete of active guest refused", gDelActive.status === 400);
+await j("/api/admin/guest", { id: GID, action: "disable" }, { cookie });
+const gDel = await j("/api/admin/guest", { id: GID, action: "delete" }, { cookie });
+check("guest deleted, link + page gone", gDel.status === 200 && (await fetch(gMe.link)).status === 404 && (await fetch(BASE + "/g/" + GID)).status === 404);
+
+// ---- minute-level durations (admin licenses + guests) ----
+const MM1 = "TESTMACH000000101", MM2 = "TESTMACH000000102", MM3 = "TESTMACH000000103";
+const minIssue = await j("/api/admin/issue", { machineCode: MM1, durationValue: 5, durationUnit: "minute", note: "五分钟客户", mode: "code" }, { cookie });
+check("issue 5-minute code", minIssue.status === 200 && /^V2O-/.test(minIssue.data.code || ""));
+const devM1 = await newDeviceKey();
+const actM1 = await j("/api/activate", { machineCode: MM1, code: minIssue.data.code, pubkey: devM1.pubkey });
+const listM = await (await fetch(BASE + "/api/admin/devices", { headers: { cookie } })).json();
+const rowM1 = (listM.devices || []).find((d) => d.machine === MM1);
+check("5-minute expiry exact (expires_at - activated_at == 300)",
+  actM1.status === 200 && !!rowM1 && rowM1.lic.expires_at - rowM1.lic.activated_at === 300,
+  rowM1 ? `diff=${rowM1.lic.expires_at - rowM1.lic.activated_at}` : "row missing");
+const valM1 = await j("/api/validate", { machineCode: MM1, token: actM1.data.token });
+check("5-minute validate remain_sec in range", valM1.status === 200 && valM1.data.remain_sec > 0 && valM1.data.remain_sec <= 300, `remain=${valM1.data.remain_sec}`);
+const oneIssue = await j("/api/admin/issue", { machineCode: MM2, durationValue: 1, durationUnit: "minute", note: "一分钟客户", mode: "code" }, { cookie });
+const devM2 = await newDeviceKey();
+await j("/api/activate", { machineCode: MM2, code: oneIssue.data.code, pubkey: devM2.pubkey });
+const listM2 = await (await fetch(BASE + "/api/admin/devices", { headers: { cookie } })).json();
+const rowM2 = (listM2.devices || []).find((d) => d.machine === MM2);
+check("1-minute expiry exact (diff == 60)", !!rowM2 && rowM2.lic.expires_at - rowM2.lic.activated_at === 60,
+  rowM2 ? `diff=${rowM2.lic.expires_at - rowM2.lic.activated_at}` : "row missing");
+const minIssued = await j("/api/admin/issue", { machineCode: MM3, durationValue: 5, durationUnit: "minute", note: "未激活五分钟", mode: "code" }, { cookie });
+const listM3 = await (await fetch(BASE + "/api/admin/devices", { headers: { cookie } })).json();
+const issuedM3 = (listM3.issued || []).find((i) => i.machine === MM3);
+check("issued list shows 5分钟, not 0 天", minIssued.status === 200 && !!issuedM3 && issuedM3.duration_text === "5分钟", issuedM3 ? issuedM3.duration_text : "missing");
+const badDur = await j("/api/admin/issue", { machineCode: MM3, durationValue: 0, durationUnit: "minute", mode: "code" }, { cookie });
+check("zero-minute duration rejected", badDur.status === 400);
+const badUnit = await j("/api/admin/issue", { machineCode: MM3, durationValue: 5, durationUnit: "week", mode: "code" }, { cookie });
+check("bogus duration unit rejected", badUnit.status === 400);
+// guest with a 1-minute account: login, minute-level remaining, expiry
+const gmCreate = await j("/api/admin/guest", { action: "create", username: "一分钟游客", password: "guest-pw-1", durationValue: 1, durationUnit: "minute" }, { cookie });
+check("admin creates 1-minute guest", gmCreate.status === 200 && !!gmCreate.data.id, JSON.stringify(gmCreate.data).slice(0, 80));
+const GMID = gmCreate.data.id;
+const gmLogin = await j("/api/guest/login", { id: GMID, password: "guest-pw-1" });
+check("1-minute guest logs in", gmLogin.status === 200 && typeof gmLogin.data.session === "string");
+const gmMe = await (await fetch(BASE + "/api/guest/me", { headers: { "x-gsess": gmLogin.data.session } })).json();
+check("1-minute guest sees minute-level remaining", gmMe.ok === true && gmMe.remain_sec > 0 && gmMe.remain_sec <= 60 && gmMe.minutes_left === 1, `remain_sec=${gmMe.remain_sec}`);
+check("1-minute guest link serves before expiry", (await fetch(gmMe.link)).status === 200);
+await j("/api/admin/guest", { id: GMID, action: "extend", days: -1 }, { cookie });
+check("guest link dies once past expiry", (await fetch(gmMe.link)).status === 403);
+const gmLoginExpired = await j("/api/guest/login", { id: GMID, password: "guest-pw-1" });
+check("expired guest cannot log in", gmLoginExpired.status === 403 && gmLoginExpired.data.reason === "expired");
+await j("/api/admin/guest", { id: GMID, action: "extend", days: 2 }, { cookie });
+check("guest link alive again after extend", (await fetch(gmMe.link)).status === 200);
+await j("/api/admin/guest", { id: GMID, action: "disable" }, { cookie });
+await j("/api/admin/guest", { id: GMID, action: "delete" }, { cookie });
 
 // ---- legacy offline-code conversion (fixture key; skipped if absent) ----
 import { readFileSync } from "node:fs";
