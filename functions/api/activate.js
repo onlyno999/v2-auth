@@ -17,7 +17,11 @@ export async function finishActivation(env, lic, body) {
     const verdict = await verifyAttestation(body.attestation.map((c) => b64Decode(c)), {
       challenge: b64Decode(chal),
       packageName: env.EXPECTED_PACKAGE || "com.v2ray.ang.fdroid",
-      certSha256Hex: env.EXPECTED_CERT_SHA256 || "",
+      // The genuine client builds are signed with the owner's personal
+      // certificate; its SHA-256 is public (printed on every APK), so
+      // it is safe as a built-in default. A repackaged build is signed
+      // with a different key and fails this check. Env can override.
+      certSha256Hex: env.EXPECTED_CERT_SHA256 || "221f4dd0cfef8b76785ffc82ada95b23961553927aadbcc920395fdbd119758a",
       rootPinHex: env.ATTEST_ROOT_SHA256 || null,
     });
     if (!verdict.ok) {
