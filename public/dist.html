@@ -109,17 +109,7 @@
       </table>
     </div>
 
-    <h2>我名下的分销商 <a href="/distbill.html"><button class="ghost small" type="button">下级对账（我定的价）</button></a></h2>
-    <div class="card">
-      <div class="row">
-      <div class="muted" style="margin:8px 0" id="subHint">下级分销商由总后台统一添加（挂在谁名下由总后台定：每人最多 3 个下级、共 5 级）；你只在这里管理你名下的下级，不能自己开分销商。</div>
-      <table>
-        <thead><tr><th>登录地址</th><th>额度</th><th>状态</th><th>操作</th><th>标识 / 名称</th></tr></thead>
-        <tbody id="subBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
-      </table>
-    </div>
-
-    <h2>进货流水</h2>
+    <h2>进货流水 <a href="/distbill.html"><button class="ghost small" type="button">下级对账（我定的价）</button></a></h2>
     <div class="card">
       <div class="muted" style="margin-bottom:6px">额度就是货：你从上级进货、上级给你补额度，这里记一笔；你给下级补额度，也记一笔。钱你们线下结，这里只留账。</div>
       <div id="stockMine" class="muted">加载中…</div>
@@ -202,7 +192,6 @@ async function loadMe() {
     $("console").classList.remove("hidden");
     loadDevices();
     loadGuests();
-    loadSubs();
     loadStock();
   }
 }
@@ -275,55 +264,6 @@ async function loadDevices() {
   applyFilter("qMyDevices", "tbody");
 }
 $("refreshBtn").onclick = loadDevices;
-
-async function loadSubs() {
-  const { data } = await api("/api/dist/dist");
-  if (!data.ok) { $("subBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
-  const left = data.max_children - data.distributors.length;
-  $("subHint").textContent = `下级分销商由总后台统一添加（挂在谁名下由总后台定：每人最多 3 个下级、共 5 级）；你只在这里管理你名下的下级，不能自己开分销商。你是第 ${data.level} 级，名下现有 ${data.distributors.length} 个下级。`;
-  if (!data.distributors.length) {
-    $("subBody").innerHTML = '<tr><td colspan="5" class="muted">还没有下级分销商</td></tr>';
-    return;
-  }
-  $("subBody").innerHTML = data.distributors.map((d) => `<tr>
-    <td class="mono" data-label="登录地址">${location.origin}/${d.slug}</td>
-    <td data-label="额度">${d.used} / ${d.quota < 0 ? "不限" : d.quota}<div class="muted">客户 ${d.users.devices} 台${d.users.pending ? "（待激活 " + d.users.pending + "）" : ""} · 游客 ${d.users.guests} 个 · 下级 ${d.children}/${data.max_children}</div><div>本月开了 ${d.month_units || 0} 个月 · 应交我 <b>${d.owe_to_me === null || d.owe_to_me === undefined ? "未定价，算不出" : "¥" + d.owe_to_me}</b></div></td>
-    <td data-label="状态">${!d.has_pw ? "待他设密码" : (d.status === "active" ? "正常" : "已停用")}</td>
-    <td class="acts"><a href="/subtree.html?slug=${d.slug}"><button class="small ghost" type="button">看名下</button></a>
-    ${d.status === "active"
-      ? `<button class="small danger" onclick="subAct('${d.slug}','disable')">停用</button>`
-      : `<button class="small ghost" onclick="subAct('${d.slug}','enable')">恢复</button>
-         <button class="small danger" onclick="subAct('${d.slug}','delete')">删除账户</button>`}
-      <button class="small ghost" onclick="subAct('${d.slug}','resetpw')">重置密码</button>
-      <button class="small ghost" onclick="subAct('${d.slug}','rename')">改名</button>
-      <button class="small ghost" onclick="subAct('${d.slug}','reslug')">标识</button>
-      <button class="small ghost" onclick="subAct('${d.slug}','quota')">改额度</button></td>
-    <td class="mono" data-label="标识 / 名称">${d.slug}<div class="muted">${d.name || ""}</div></td></tr>`).join("");
-}
-async function subAct(slug, action) {
-  const body = { slug, action };
-  if (action === "resetpw" && !confirm(`重置 ${slug} 的密码？他下次打开链接时要重新设置密码。`)) return;
-  if (action === "delete" && !confirm(`彻底删除分销商 ${slug}？删除后他的链接立即失效、不可恢复（他已发出的客户不受影响；有下级的不能删）。`)) return;
-  if (action === "quota") {
-    const q = prompt(`分销商 ${slug} 的总额度（个数，-1 = 不限）：`);
-    if (q === null || q === "") return;
-    body.quota = Number(q);
-  }
-  if (action === "rename") {
-    const n = prompt(`分销商 ${slug} 的新名称（用户名）：`);
-    if (n === null || !n.trim()) return;
-    body.name = n.trim();
-  }
-  if (action === "reslug") {
-    const n = prompt(`把 ${slug} 的登录标识改成（小写字母/数字/-/_，2–24 位）：\n改完他的登录地址变成 ${location.origin}/新标识，旧地址立即失效；密码、额度、客户都不变。`);
-    if (n === null || !n.trim()) return;
-    body.new_slug = n.trim().toLowerCase();
-  }
-  const { data } = await api("/api/dist/dist", { method: "POST", body: JSON.stringify(body) });
-  if (!data.ok) alert("失败：" + (data.reason === "exists" ? "这个标识已被占用" : data.reason === "bad_slug" ? "标识格式不对" : data.reason === "has_children" ? "他还有下级分销商，不能删除" : data.reason === "disable_first" ? "先停用才能删除" : data.reason || ""));
-  loadSubs();
-}
-window.subAct = subAct;
 
 async function loadStock() {
   const { data } = await api("/api/dist/stock");
