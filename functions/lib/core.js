@@ -421,6 +421,59 @@ export async function listDistChildren(env, slug) {
   return out;
 }
 
+// Deleting a distributor clears EVERYTHING he issued with him
+// (owner's standing rule, restated 2026-11-04: 'once deleted, it
+// must be cleared out'). The old code deleted only the dist
+// record and left his licenses and guests alive as orphans —
+// still validating, still pulling subscriptions, still listed
+// under a dead channel, while the parent's card read empty:
+// exactly the 'deleted but not synced' mess the owner kept
+// hitting. Cascade: his licenses (any status) plus every per-
+// machine trace (same set as the admin device hard delete),
+// his guests, then the dist record itself. The stock ledger
+// (stk:) is NOT touched: it is the accounting history of money
+// that really moved, not a live reference. Callers keep the
+// guards (disabled first, no children) — children are placed
+// and removed one by one, never cascaded silently.
+export async function deleteDistributorCascade(env, slug) {
+  let licenses = 0, guests = 0;
+  let cursor;
+  do {
+    const page = await env.V2.list({ prefix: "lic:", limit: 200, cursor });
+    cursor = page.list_complete ? undefined : page.cursor;
+    for (const k of page.keys) {
+      const raw = await env.V2.get(k.name);
+      if (!raw) continue;
+      const rec = JSON.parse(raw);
+      if (rec.dist !== slug) continue;
+      if (rec.machine) {
+        await env.V2.delete("dev:" + rec.machine);
+        await env.V2.delete("open:" + rec.machine);
+        await env.V2.delete("last:" + rec.machine);
+        await env.V2.delete("chal:" + rec.machine);
+        await env.V2.delete("attestfail:" + rec.machine);
+      }
+      await env.V2.delete(k.name);
+      licenses++;
+    }
+  } while (cursor);
+  cursor = undefined;
+  do {
+    const page = await env.V2.list({ prefix: "gst:", limit: 200, cursor });
+    cursor = page.list_complete ? undefined : page.cursor;
+    for (const k of page.keys) {
+      const raw = await env.V2.get(k.name);
+      if (!raw) continue;
+      const rec = JSON.parse(raw);
+      if (rec.dist !== slug) continue;
+      await env.V2.delete(k.name);
+      guests++;
+    }
+  } while (cursor);
+  await env.V2.delete("dist:" + slug);
+  return { licenses, guests };
+}
+
 // Quota is priced by DURATION (owner, 2026-11-04: the tree runs
 // on margin — a year card may not cost the same shelf space as a
 // month card). One unit of quota = one average month

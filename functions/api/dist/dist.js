@@ -1,7 +1,7 @@
 import {
   json, readJson, nowSec, sha256hex, getDist, putDist, distSlugFromRequest,
   SLUG_RE, RESERVED_SLUGS, bumpDataVersion, moveDistributor, listDistChildren,
-  distLevel, recordStock,
+  distLevel, recordStock, deleteDistributorCascade,
 } from "../../lib/core.js";
 import { buildTree } from "../../lib/tree.js";
 
@@ -129,7 +129,7 @@ export async function onRequestPost({ request, env }) {
       if ((await listDistChildren(env, child)).length) {
         return json({ ok: false, reason: "has_children" }, 400);
       }
-      await env.V2.delete("dist:" + child);
+      await deleteDistributorCascade(env, child);
       return json({ ok: true });
     default:
       return json({ ok: false, reason: "bad_action" }, 400);

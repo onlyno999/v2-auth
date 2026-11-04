@@ -1,6 +1,6 @@
 import {
   json, readJson, nowSec, isAdmin, sha256hex, getDist, putDist, SLUG_RE, RESERVED_SLUGS,
-  bumpDataVersion, cachedPayload, moveDistributor, listDistChildren, distLevel, recordStock,
+  bumpDataVersion, cachedPayload, moveDistributor, listDistChildren, distLevel, recordStock, deleteDistributorCascade,
 } from "../../lib/core.js";
 
 // GET -> all distributors. POST -> create / update / disable / enable.
@@ -161,13 +161,15 @@ export async function onRequestPost({ request, env }) {
       return json({ ok: true });
     case "delete":
       // Only a disabled account can be deleted (guard against wiping
-      // an active distributor). His already-issued customers keep
-      // their licenses untouched; the /<slug> link dies immediately.
+      // an active distributor). Deletion is TOTAL (owner's rule:
+      // once deleted, cleared out): his licenses and guests are
+      // deleted with him — no orphans left validating under a dead
+      // channel. The /<slug> link dies immediately.
       if (rec.status !== "disabled") return json({ ok: false, reason: "disable_first" }, 400);
       if ((await listDistChildren(env, slug)).length) {
         return json({ ok: false, reason: "has_children" }, 400);
       }
-      await env.V2.delete("dist:" + slug);
+      await deleteDistributorCascade(env, slug);
       return json({ ok: true });
     default:
       return json({ ok: false, reason: "bad_action" }, 400);
