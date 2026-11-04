@@ -68,8 +68,6 @@
     <h3>游客</h3>
     <table><thead><tr><th>用户名</th><th>到期</th><th>状态</th></tr></thead><tbody id="guestBody"><tr><td colspan="4" class="muted">加载中…</td></tr></tbody></table>
     <div id="statsBox" style="margin-top:14px"></div>
-    <h3>下级分销商</h3>
-    <table><thead><tr><th>标识 / 名称</th><th>名下</th><th>状态</th><th>操作</th></tr></thead><tbody id="subBody"><tr><td colspan="4" class="muted">加载中…</td></tr></tbody></table>
   </div>
 </div>
 <script>
@@ -104,13 +102,6 @@ async function devAct(machine, action) {
 window.devAct = devAct;
 async function guestAct(id, action) { people("guest", id, action); }
 window.guestAct = guestAct;
-async function subAct(slug, action) {
-  if (action === "disable" && !confirm(`停用分销商 ${slug}？他将登不进后台（他已发出的客户不受影响，可恢复）。`)) return;
-  people("sub", slug, action);
-}
-window.subAct = subAct;
-
-
 async function load() {
   const { data } = await api(API + "?slug=" + encodeURIComponent(SLUG));
   if (!data.ok) {
@@ -153,15 +144,7 @@ async function load() {
     <div style="margin-top:8px">本月合计：开通 ${data.stats.month.count} 个 · ${data.stats.month.units} 个月 · <b>¥${data.stats.month.money}</b></div>
     <div>累计合计：开通 ${data.stats.total.count} 个 · ${data.stats.total.units} 个月 · <b>¥${data.stats.total.money}</b></div>
     <div class="muted" style="margin-top:4px">金额按 ${data.stats.ref_price} 元/月参考价折算（年卡按 12 个月计）；他实际卖多少钱是他自己的事，这里只做统计。</div>`;
-  $("subBody").innerHTML = data.subs.length ? data.subs.map((x) => `<tr>
-    <td class="mono" data-label="分销商">${x.slug}<div class="muted">${x.name || ""} · 第${x.level}级</div></td>
-    <td data-label="名下">客户 ${x.devices} 台${x.pending ? "（待激活 " + x.pending + "）" : ""} · 游客 ${x.guests} 个 · 下级 ${x.children} 个<div>本月开了 ${x.month_units || 0} 个月 · 应交本页主人 <b>${x.owe_to_root === null || x.owe_to_root === undefined ? "未定价，算不出" : "¥" + x.owe_to_root}</b></div></td>
-    <td data-label="状态">${x.status === "disabled" ? "已停用" : "正常"}</td>
-    <td class="acts"><a href="${PAGE}?slug=${x.slug}&from=${SLUG}from=${data.dist.slug}"><button class="small ghost">进去看</button></a>
-    ${ACT ? (x.status === "disabled"
-      ? `<button class="small ghost" onclick="subAct('${x.slug}','enable')">恢复</button>`
-      : `<button class="small danger" onclick="subAct('${x.slug}','disable')">停用</button>`) : ""}</td>
-  </tr>`).join("") : `<tr><td colspan="4" class="muted">没有下级分销商</td></tr>`;
+
 }
 if (FROM) {
   const b = $("upBtn");
