@@ -1,4 +1,4 @@
-import { getDist, listDistChildren, distLevel, cachedPayload, quotaCostFor, nowSec, beijingDay, tierForLevel, consoleUnitPrice } from "./core.js";
+import { getDist, listDistChildren, distLevel, cachedPayload, quotaCostFor, nowSec, beijingDay, consoleUnitPrice } from "./core.js";
 
 // Shared subtree builder for the two 名下 pages (admin tree.html
 // and distributor subtree.html): one distributor's direct people
@@ -112,8 +112,7 @@ export async function buildTree(env, slug) {
     let oweParent = null;
     if (!root.parent) {
       const base = await consoleUnitPrice(env);
-      oweParent = Math.round(Object.entries(statsMonth.by_level || {})
-        .reduce((a, [lv, u]) => a + u * tierForLevel(base, Number(lv)), 0) * 100) / 100;
+      oweParent = Math.round(statsMonth.units * base * 100) / 100;
     } else {
       const p = await getDist(env, root.parent);
       if (p && Number.isFinite(p.price) && p.price > 0) {

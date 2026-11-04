@@ -433,16 +433,8 @@ export const MONTH_SEC = 2629800;
 export async function consoleUnitPrice(env) {
   const raw = await env.V2.get("meta:unitprice");
   const n = raw ? Number(raw) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : 4;
+  return Number.isFinite(n) && n > 0 ? n : 3;
 }
-
-// Console's tiered take per month unit, by the SELLER's level
-// (owner, 2026-11-04): level 1 pays the base price (default 4),
-// each deeper level 1 yuan less, floored at 1 — "even at the
-// 9th layer the console still earns 1 yuan". A level-2 sale
-// like vb's therefore settles 3 to the console, not 4.
-export const tierForLevel = (base, level) =>
-  Math.max(1, base - (Math.max(1, level) - 1));
 
 export function quotaCostFor(durationSec) {
   return Math.max(1, Math.ceil(durationSec / MONTH_SEC));

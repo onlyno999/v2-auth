@@ -62,19 +62,18 @@
   <h2 id="title">本月汇总（直推代理应交）</h2>
   <div class="card">
     <div class="row" style="margin-bottom:10px">
-      <span>第一级每个月按</span>
+      <span>每个月按</span>
       <input id="price" type="number" step="0.5" min="0" style="width:90px">
-      <span>元 / 月 结算（阶梯基准）</span>
+      <span>元 / 月 结算</span>
       <button id="priceBtn" class="small">保存单价</button>
       <span id="priceMsg" class="muted"></span>
     </div>
-    <div id="tiers" class="muted" style="margin-bottom:4px"></div>
-    <div id="summary" class="muted" style="margin-bottom:10px">加载中…</div>
+        <div id="summary" class="muted" style="margin-bottom:10px">加载中…</div>
     <table>
       <thead><tr><th>直推代理</th><th>名下</th><th>本月开通</th><th>折算月数</th><th>本月应交</th></tr></thead>
       <tbody id="rows"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
     </table>
-    <div class="muted" style="margin-top:8px">算法：每个直推代理名下整棵树本月开的会员，先按时长折算成月数（月卡 1、季卡 3、半年 6、年卡 12），再按卖家所在的级收钱——第一级自己卖的按上面的单价，第二级卖的每月份少 1 块，第三级再少 1 块，第四级起每单保底 1 块/月（卖得再深，总台每个月也有一块）。开几个月就乘几个月，一次交清。直推代理把整棵树的钱一次结清；他卖给下级多少钱是他自己的事，点代理名可以进名下页看明细。</div>
+    <div class="muted" style="margin-top:8px">算法：每个直推代理名下整棵树本月开的会员，按时长折算成月数（月卡 1、季卡 3、半年 6、年卡 12），乘以上面的单价——不管第几级卖的，总台都按这个价收，开几个月乘几个月。直推代理把整棵树的钱一次结清；他卖给下级多少钱是他自己的事，点代理名可以进名下页看明细。</div>
   </div>
 </div>
 <script>
@@ -92,13 +91,12 @@ async function load() {
   if (!data.ok) { $("summary").textContent = "登录已失效，请返回总后台重新登录。"; $("rows").innerHTML = ""; return; }
   $("price").value = data.unit_price;
   $("summary").innerHTML = `本月全部直推代理共应交 <b>${money(data.total_due)}</b>（合计 ${data.total_units} 个月）`;
-  if (data.tiers) $("tiers").textContent = "总台阶梯收法：" + data.tiers.map((t) => `第${t.level}级卖的 ¥${t.rate}/月`).join(" · ") + " · 第 6 级起 ¥1/月（保底）。开几个月就乘几个月：年卡 = 月价 × 12。";
   $("rows").innerHTML = data.rows.length ? data.rows.map((r) => `<tr>
     <td class="mono" data-label="直推代理"><a href="/tree.html?slug=${r.slug}">${r.slug}</a><div class="muted">${r.name || ""}${r.status === "disabled" ? " · 已停用" : ""}</div></td>
     <td data-label="名下">分销商 ${r.subs} 人 · 客户 ${r.devices} 台</td>
     <td data-label="本月开通">${r.month_count} 个</td>
     <td data-label="折算月数">${r.month_units} 个月</td>
-    <td data-label="本月应交"><b>${money(r.due)}</b><div class="muted">${(r.breakdown || []).map((b) => `第${b.level}级 ${b.units} 个月×¥${b.rate}`).join(" ＋ ")}</div></td></tr>`).join("")
+    <td data-label="本月应交"><b>${money(r.due)}</b></td></tr>`).join("")
     : '<tr><td colspan="5" class="muted">还没有直推代理</td></tr>';
 }
 $("priceBtn").onclick = async () => {

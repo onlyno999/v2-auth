@@ -1,5 +1,5 @@
 import {
-  json, readJson, getDist, putDist, distSlugFromRequest, listDistChildren, tierForLevel, distLevel,
+  json, readJson, getDist, putDist, distSlugFromRequest, listDistChildren, consoleUnitPrice,
 } from "../../lib/core.js";
 import { buildTree } from "../../lib/tree.js";
 
@@ -16,11 +16,6 @@ import { buildTree } from "../../lib/tree.js";
 //     units x his parent's price (the console's global price
 //     when his parent is the console), so both sides of every
 //     father-son account read the same numbers.
-async function consolePrice(env) {
-  const raw = await env.V2.get("meta:unitprice");
-  const n = raw ? Number(raw) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : 4;
-}
 
 // What one unit sold by MY subs costs me — the floor basis for
 // my own pricing (every layer keeps at least 1 yuan). When my
@@ -30,8 +25,8 @@ async function consolePrice(env) {
 // not priced yet).
 async function costBasis(env, rec) {
   if (!rec.parent) {
-    const base = await consolePrice(env);
-    return { cost: tierForLevel(base, distLevel(rec) + 1), base };
+    const base = await consoleUnitPrice(env);
+    return { cost: base, base };
   }
   const p = await getDist(env, rec.parent);
   if (p && Number.isFinite(p.price) && p.price > 0) return { cost: p.price, base: null };
@@ -46,24 +41,19 @@ export async function onRequestGet({ request, env }) {
   const myPrice = Number.isFinite(rec.price) && rec.price > 0 ? rec.price : null;
 
   let parentPrice = null;
-  if (!rec.parent) parentPrice = await consolePrice(env);
+  if (!rec.parent) parentPrice = await consoleUnitPrice(env);
   else {
     const p = await getDist(env, rec.parent);
     if (p && Number.isFinite(p.price) && p.price > 0) parentPrice = p.price;
   }
   const myTree = await buildTree(env, me);
   const myUnits = myTree ? myTree.stats.month.units : 0;
-  // Owed upward: to the console it is the TIERED sum over my
-  // subtree's sales by seller level; to a distributor parent it
-  // is his price times my subtree units (the goods I stocked).
-  let oweBreakdown = null;
+  // Owed upward: the console takes its flat per-month price on
+  // every unit in my subtree (whatever level sold it); a
+  // distributor parent takes his own price on the same units.
+  // Either way it is units x one price — the two books mirror.
   let oweParent = null;
-  if (!rec.parent && myTree) {
-    oweBreakdown = Object.entries(myTree.stats.month.by_level || {})
-      .map(([lv, units]) => ({ level: Number(lv), units, rate: tierForLevel(parentPrice, Number(lv)), amount: Math.round(units * tierForLevel(parentPrice, Number(lv)) * 100) / 100 }))
-      .sort((a, b) => a.level - b.level);
-    oweParent = Math.round(oweBreakdown.reduce((a, b) => a + b.amount, 0) * 100) / 100;
-  } else if (parentPrice !== null) {
+  if (parentPrice !== null) {
     oweParent = Math.round(myUnits * parentPrice * 100) / 100;
   }
   const basis = await costBasis(env, rec);
@@ -90,7 +80,6 @@ export async function onRequestGet({ request, env }) {
     parent: rec.parent || "admin",
     my_units: myUnits,
     owe_parent: oweParent,
-    owe_breakdown: oweBreakdown,
     cost_basis: basis.cost,
     price_floor: basis.cost === null ? null : basis.cost + 1,
     rows,
@@ -111,10 +100,10 @@ export async function onRequestPost({ request, env }) {
   // Ladder floor (owner, 2026-11-04): pricing is his own business
   // FROM level 1 down — but every layer must keep at least 1 yuan
   // per unit, so a price may not sit below what a sub's sale
-  // costs him + 1. For a level-1 that cost is the console tier
-  // for level 2 (base - 1 = 3 by default, floor 4); deeper, it
-  // is his parent's price. When the parent has not priced yet
-  // the cost is unknowable and any price stands.
+  // costs him + 1. For a level-1 that cost is the console's flat
+  // take (3 by default, floor 4); deeper, it is his parent's
+  // price. When the parent has not priced yet the cost is
+  // unknowable and any price stands.
   const { cost } = await costBasis(env, rec);
   if (cost !== null && n < cost + 1) {
     return json({ ok: false, reason: "below_floor", cost, floor: cost + 1 }, 400);
