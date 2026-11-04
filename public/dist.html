@@ -255,7 +255,12 @@ async function loadDevices() {
   const { data } = await api("/api/dist/devices");
   if (!data.ok) { $("tbody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
   if (!data.devices.length) { $("tbody").innerHTML = '<tr><td colspan="5" class="muted">还没有客户</td></tr>'; return; }
-  $("tbody").innerHTML = data.devices.map((d) => `<tr>
+  $("tbody").innerHTML = data.devices.map((d) => d.pending ? `<tr>
+    <td class="mono">${d.machine}<div class="muted">${d.lic.note || ""}</div></td>
+    <td data-label="激活">待激活</td>
+    <td data-label="到期">激活后起算</td>
+    <td data-label="最近打开">—</td>
+    <td data-label="状态">已卖出 · 待激活</td></tr>` : `<tr>
     <td class="mono">${d.machine}<div class="muted">${d.lic.note || ""}</div></td>
     <td data-label="激活">${fmt(d.lic.activated_at)}</td>
     <td data-label="到期">${d.lic.expires_at ? fmt(d.lic.expires_at) : "—"}</td>

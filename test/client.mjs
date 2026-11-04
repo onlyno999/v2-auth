@@ -243,7 +243,10 @@ const qq2Cookie = (qq2LoginRes.headers.get("set-cookie") || "").split(";")[0];
 const dWeighted = await j("/api/dist/issue", { machineCode: "QQ22-MACH-0000-0001", days: 90, mode: "code" }, { cookie: qq2Cookie });
 check("90-day card costs 3 quota units", dWeighted.status === 403 && dWeighted.data.cost === 3 && dWeighted.data.remaining === 2);
 const dDevices = await fetch(BASE + "/api/dist/devices", { headers: { cookie: dcookie } }).then((r) => r.json());
-check("dist sees only own customers", dDevices.ok === true && dDevices.devices.length === 1 && dDevices.devices[0].machine === M5);
+check("dist sees only own customers (incl. sold-unactivated)", dDevices.ok === true
+  && JSON.stringify(dDevices.devices.map((d) => d.machine).sort()) === JSON.stringify([M5, M6].sort())
+  && dDevices.devices.find((d) => d.machine === M5 && !d.pending)
+  && dDevices.devices.find((d) => d.machine === M6 && d.pending === true));
 const disableDist = await j("/api/admin/dist", { slug: "mmm", action: "disable" }, { cookie });
 const distLoginDisabled = await j("/api/dist/login", { slug: "mmm", password: "dist-pw-1" });
 check("disabled distributor cannot log in", disableDist.status === 200 && distLoginDisabled.status === 401);

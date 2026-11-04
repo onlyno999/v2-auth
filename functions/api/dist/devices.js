@@ -37,5 +37,38 @@ async function buildDevices(env, slug) {
       },
     });
   }
-  return out;
+  // Sold but not yet activated (owner, 2026-11-04: his customer
+  // list read empty while his quota already counted the sales —
+  // 'not one person under him, and the quota is out of sync').
+  // An issued code / direct open has no device record until the
+  // buyer first opens the app, so list those licenses too,
+  // flagged pending, on top: they ARE his people, just waiting.
+  const pending = [];
+  let cursor2;
+  do {
+    const page = await env.V2.list({ prefix: "lic:", limit: 200, cursor: cursor2 });
+    cursor2 = page.list_complete ? undefined : page.cursor;
+    for (const k of page.keys) {
+      const raw = await env.V2.get(k.name);
+      if (!raw) continue;
+      const rec = JSON.parse(raw);
+      if (rec.dist !== slug) continue;
+      if (rec.status !== "issued" && rec.status !== "open") continue;
+      pending.push({
+        machine: rec.machine,
+        pending: true,
+        platform: "",
+        last_seen: null,
+        pulls: 0,
+        lic: {
+          status: rec.status, note: rec.note || "",
+          created_at: rec.created_at || null,
+          duration_sec: rec.duration_sec || null,
+          days: rec.days || null,
+        },
+      });
+    }
+  } while (cursor2);
+  pending.sort((a, b) => (b.lic.created_at || 0) - (a.lic.created_at || 0));
+  return [...pending, ...out];
 }
