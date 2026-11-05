@@ -25,35 +25,24 @@ function channelCfg(env, channel) {
 }
 
 export async function serveSubscription(env, channel) {
-  const { url, prefix } = channelCfg(env, channel);
-  // REAL-TIME pull (owner, 2026-11-05): every serve fetches the
-  // subscription address fresh, so upstream changes (nodes added
-  // or removed) reach customers on their very next pull instead
-  // of up to 30 minutes later. The fetched copy is still stored
-  // — purely as the emergency fallback for the moments the
-  // upstream itself is unreachable; a stored copy is served ONLY
-  // when the live fetch fails, never because it is "fresh
-  // enough".
-  if (url) {
-    try {
-      const up = await fetch(url, {
-        headers: { "user-agent": "okhttp/4.9.0" },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (up.ok) {
-        const text = await up.text();
-        if (text && text.length > 50) {
-          try {
-            await env.V2.put(prefix + ":content", text);
-            await env.V2.put(prefix + ":fetched_at", String(nowSec()));
-          } catch { /* the fallback copy is best-effort */ }
-          return text;
-        }
-      }
-    } catch { /* upstream down: fall through to the stored copy */ }
-  }
+  const { url } = channelCfg(env, channel);
+  // REAL-TIME ONLY, no cache is ever served (owner, 2026-11-05):
+  // the node addresses inside the subscription rotate constantly,
+  // so a stored copy is a list of dead addresses — serving it
+  // "as a fallback" hands the customer junk that looks like a
+  // working config. Every serve fetches the subscription address
+  // fresh and returns exactly that; when the live fetch fails
+  // the serve fails with it (callers answer sub_unavailable /
+  // hard deny) and the client retries later. Nothing is stored.
+  if (!url) return null;
   try {
-    return await env.V2.get(prefix + ":content");
+    const up = await fetch(url, {
+      headers: { "user-agent": "okhttp/4.9.0" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!up.ok) return null;
+    const text = await up.text();
+    return text && text.length > 50 ? text : null;
   } catch {
     return null;
   }
