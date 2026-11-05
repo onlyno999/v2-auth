@@ -5,19 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>v2one999 授权后台</title>
 <style>
-  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; background: #f4f5f7; color: #1c2333; }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px 48px; }
-  h1 { font-size: 20px; margin: 8px 0 16px; }
-  h2 { font-size: 15px; margin: 22px 0 10px; color: #334; }
-  .card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(20,30,60,.08); }
-  input, select { padding: 8px 10px; border: 1px solid #ccd2dd; border-radius: 6px; font-size: 14px; }
-  button { padding: 8px 14px; border: 0; border-radius: 6px; background: #14181f; color: #fff; font-size: 14px; cursor: pointer; }
-  button.ghost { background: #e8ebf0; color: #1c2333; }
-  button.danger { background: #c0392b; }
-  button.small { padding: 4px 9px; font-size: 12px; margin-right: 4px; }
+  :root { --ink:#1c2333; --blue:#2f7cf6; --violet:#7c5cf6; --teal:#12b5a5; --amber:#f5a623; --red:#e5484d; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; color: var(--ink);
+    background: linear-gradient(180deg, #eaf3ff 0, #f7f9fc 240px, #f7f9fc 100%); min-height: 100vh; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 18px 16px 48px; }
+
+  /* Top bar: brand left, avatar (login entry) right */
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 18px; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .logo { width: 44px; height: 44px; flex: none; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--blue), var(--violet)); color: #fff; font-size: 22px; font-weight: 800;
+    box-shadow: 0 6px 16px rgba(64,110,246,.35); }
+  .brand h1 { font-size: 20px; margin: 0; line-height: 1.2; }
+  .brandsub { color: #7a8699; font-size: 12px; margin-top: 2px; }
+  .avatar { width: 44px; height: 44px; flex: none; border-radius: 50%; padding: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--teal), var(--blue)); border: 2px solid #fff;
+    box-shadow: 0 4px 14px rgba(30,120,200,.35); }
+  .avatar:active { transform: scale(.96); }
+
+  h2 { font-size: 15px; margin: 26px 0 10px; color: #223; display: flex; align-items: center; gap: 8px; }
+  h2::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, var(--blue), var(--violet)); flex: none; }
+  .card { background: #fff; border: 1px solid #e6ebf2; border-radius: 14px; padding: 16px; box-shadow: 0 4px 18px rgba(30,60,120,.06); }
+  .login-card { max-width: 520px; margin: 8px auto 4px; padding: 22px 20px;
+    background: linear-gradient(180deg, #ffffff, #f2f7ff); border-color: #d9e6fb; }
+  .login-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  input, select { padding: 9px 11px; border: 1px solid #ccd6e4; border-radius: 9px; font-size: 14px; background: #fff; }
+  input:focus, select:focus { outline: 2px solid rgba(47,124,246,.35); border-color: var(--blue); }
+  button { padding: 9px 15px; border: 0; border-radius: 9px; background: linear-gradient(135deg, var(--blue), var(--violet)); color: #fff; font-size: 14px; cursor: pointer; box-shadow: 0 3px 10px rgba(64,110,246,.25); }
+  button.ghost { background: #eef2f8; color: #1c2333; box-shadow: none; }
+  button.danger { background: var(--red); box-shadow: none; }
+  button.small { padding: 5px 10px; font-size: 12px; margin-right: 4px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #eceef2; vertical-align: top; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eef1f5; vertical-align: top; }
   th { color: #667; font-weight: 600; }
   .mono { font-family: ui-monospace, Consolas, monospace; }
   .code { font-size: 20px; font-weight: 700; letter-spacing: 1px; background: #fff8e6; border: 1px dashed #d9a441; padding: 10px 14px; border-radius: 8px; display: inline-block; }
@@ -26,16 +48,14 @@
   .tag.issued { background: #eef2fb; color: #33519c; }
   .muted { color: #889; font-size: 12px; }
   .hidden { display: none; }
-  #msg { margin: 10px 0; color: #b03a2e; min-height: 18px; }
+  #msg { margin: 10px 0 0; color: #b03a2e; min-height: 18px; }
 
-  /* Mobile (<=640px): tables turn into stacked cards — the header row
-     hides, each row becomes a bordered card whose cells render as
-     label/value lines (labels come from data-label in the row
-     templates), and action cells flow their buttons in a wrapping
-     row. Forms stack full-width. Desktop rendering is untouched. */
+  /* Mobile (<=640px): tables turn into stacked cards (same behaviour as
+     before, recoloured); forms stack full-width. Desktop untouched. */
   @media (max-width: 640px) {
     .wrap { padding: 14px 10px 40px; }
     .card { padding: 12px; }
+    .login-card { padding: 18px 14px; }
     .row { flex-direction: column; align-items: stretch; }
     .row input, .row select, .row button { width: 100% !important; min-width: 0 !important; flex: none !important; box-sizing: border-box; }
     .code { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; font-size: 17px; }
@@ -56,9 +76,22 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>v2one999 授权后台</h1>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">V</div>
+      <div>
+        <h1>v2one999 授权后台</h1>
+        <div class="brandsub">管理控制台</div>
+      </div>
+    </div>
+    <button id="avatarBtn" class="avatar" title="管理员登录" aria-label="管理员登录">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="#fff"/><path d="M4 20c1.2-3.4 4.2-5 8-5s6.8 1.6 8 5" fill="#fff"/></svg>
+    </button>
+  </header>
 
-  <div id="loginBox" class="card">
+  <div id="loginBox" class="card login-card">
+    <div class="login-title">管理员登录</div>
+    <div class="muted" style="margin-bottom:12px">点右上角头像也可回到这里；输入密码进入后台</div>
     <div class="row">
       <input id="pw" type="password" placeholder="管理员密码" style="flex:1;min-width:200px">
       <select id="loginDays" title="密码保存天数"><option value="1">保存 1 天</option><option value="2">保存 2 天</option><option value="3">保存 3 天</option><option value="4">保存 4 天</option><option value="5">保存 5 天</option><option value="6">保存 6 天</option><option value="7">保存 7 天</option></select>
@@ -628,6 +661,18 @@ $("guestCreateBtn").onclick = async () => {
     : "失败：" + (data.reason === "exists" ? "用户名已存在" : data.reason || "");
   if (data.ok) loadGuests();
 };
+</script>
+<script>
+document.getElementById("avatarBtn").addEventListener("click", () => {
+  const lb = document.getElementById("loginBox");
+  if (lb && !lb.classList.contains("hidden")) {
+    lb.scrollIntoView({ behavior: "smooth", block: "center" });
+    const pw = document.getElementById("pw");
+    if (pw) setTimeout(() => pw.focus(), 350);
+  } else {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+});
 </script>
 </body>
 </html>
