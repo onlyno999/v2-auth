@@ -76,6 +76,9 @@
   </div>
 
   <div id="console" class="hidden">
+    <div class="row" style="justify-content:flex-end;margin:2px 0 6px">
+      <button id="logoutBtn" class="ghost small" type="button">退出登录</button>
+    </div>
     <h2>给客户激活</h2>
     <div class="card">
       <div class="row">
@@ -209,6 +212,12 @@ async function doLogin() {
 }
 $("loginBtn").onclick = doLogin;
 $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+async function doLogout() {
+  try { localStorage.removeItem("v2dsess"); } catch {}
+  try { await api("/api/dist/logout", { method: "POST", body: "{}" }); } catch {}
+  location.reload();
+}
+$("logoutBtn").onclick = doLogout;
 try { const d = localStorage.getItem("v2ddays"); if (d) { $("loginDays").value = d; $("setupDays").value = d; } } catch {}
 
 function showSetup(note) {

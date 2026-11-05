@@ -58,6 +58,7 @@
 <div class="wrap">
   <div class="row" style="margin:14px 0">
     <a href="/"><button class="ghost small">← 返回总后台</button></a>
+    <button id="logoutBtn" class="ghost small" type="button">退出登录</button>
   </div>
   <h2 id="title">本月汇总（直推代理应交）</h2>
   <div class="card">
@@ -99,6 +100,18 @@ async function load() {
     <td data-label="本月应交"><b>${money(r.due)}</b></td></tr>`).join("")
     : '<tr><td colspan="5" class="muted">还没有直推代理</td></tr>';
 }
+$("logoutBtn").onclick = async () => {
+  try {
+    await fetch("/api/admin/logout", {
+      method: "POST",
+      cache: "no-store",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+  } catch {}
+  try { localStorage.removeItem("v2sess"); } catch {}
+  location.href = "/";
+};
 $("priceBtn").onclick = async () => {
   const n = Number($("price").value);
   const { data } = await api("/api/admin/summary", { method: "POST", body: JSON.stringify({ unit_price: n }) });
