@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>世界时钟 - World Clock</title>
+<title>世界时间工具</title>
 <style>
   :root { --ink:#1c2333; --blue:#2f7cf6; --violet:#7c5cf6; --teal:#12b5a5; --amber:#f5a623; --red:#e5484d; }
   * { box-sizing: border-box; }
@@ -11,13 +11,13 @@
     background: linear-gradient(180deg, #eaf3ff 0, #f7f9fc 240px, #f7f9fc 100%); min-height: 100vh; }
   .wrap { max-width: 1080px; margin: 0 auto; padding: 18px 16px 48px; }
 
-  /* Top bar: brand left, avatar right */
+  /* 顶部导航条 */
   .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 18px; }
   .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .logo { width: 44px; height: 44px; flex: none; border-radius: 14px; display: flex; align-items: center; justify-content: center;
     background: linear-gradient(135deg, var(--blue), var(--violet)); color: #fff; font-size: 22px; font-weight: 800;
     box-shadow: 0 6px 16px rgba(64,110,246,.35); }
-  .brand h1 { font-size: 20px; margin: 0; line-height: 1.2; }
+  .brand h1 { font-size: 20px; margin: 0; line-height: 1.2; transition: all 0.3s;}
   .brandsub { color: #7a8699; font-size: 12px; margin-top: 2px; }
   
   .topright { display: flex; align-items: center; gap: 12px; flex: none; position: relative; }
@@ -25,13 +25,14 @@
   .clock-time { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .5px; }
   .clock-date { color: #7a8699; font-size: 12px; }
   
+  /* 头像按钮 */
   .avatar { width: 44px; height: 44px; flex: none; border-radius: 50%; padding: 0; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     background: linear-gradient(135deg, var(--teal), var(--blue)); border: 2px solid #fff;
     box-shadow: 0 4px 14px rgba(30,120,200,.35); transition: transform 0.15s; }
   .avatar:active { transform: scale(.96); }
 
-  /* 右上角登录下拉弹窗 */
+  /* 隐藏在右上角的登录弹窗 */
   .login-popover {
     position: absolute;
     top: 56px;
@@ -54,7 +55,7 @@
     to { opacity: 1; transform: scale(1); }
   }
 
-  /* 世界时钟网格 */
+  /* 默认的世界时钟面板 */
   .world-clocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 10px; }
   .w-clock-card { background: #fff; border: 1px solid #e6ebf2; border-radius: 14px; padding: 24px 20px; text-align: center; box-shadow: 0 4px 18px rgba(30,60,120,.06); position: relative; overflow: hidden; }
   .w-clock-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--blue), var(--violet)); opacity: 0.8; }
@@ -94,7 +95,7 @@
     
     .login-popover { position: fixed; top: 76px; left: 16px; right: 16px; width: auto; transform-origin: top center; }
     
-    .clock { display: none; } /* 移动端隐藏顶部小时间，给世界时钟让出视觉焦点 */
+    .clock { display: none; } /* 移动端隐藏顶部时钟，给主区让路 */
     .brand h1 { font-size: 18px; }
     
     table, tbody, tr, td, th { display: block; width: 100%; box-sizing: border-box; }
@@ -127,19 +128,23 @@
         <div id="clockTime" class="clock-time">--:--:--</div>
         <div id="clockDate" class="clock-date"></div>
       </div>
-      <!-- 右上角小人头像 -->
+      <!-- 右上角小人头像 (加入了 pointer-events: none 防止 SVG 阻挡点击) -->
       <button id="avatarBtn" class="avatar" title="菜单" aria-label="菜单">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="#fff"/><path d="M4 20c1.2-3.4 4.2-5 8-5s6.8 1.6 8 5" fill="#fff"/></svg>
+        <svg style="pointer-events: none;" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="#fff"/><path d="M4 20c1.2-3.4 4.2-5 8-5s6.8 1.6 8 5" fill="#fff"/></svg>
       </button>
 
       <!-- 隐藏在头像下的密码输入框弹窗 -->
       <div id="loginBox" class="login-popover">
-        <div style="font-weight: 700; font-size: 16px; margin-bottom: 12px;">管理员验证</div>
+        <div style="font-weight: 700; font-size: 16px; margin-bottom: 12px; color: #1c2333;">管理员验证</div>
         <input id="pw" type="password" placeholder="请输入管理员密码" style="margin-bottom: 10px;">
         <select id="loginDays" title="密码保存天数" style="margin-bottom: 12px;">
           <option value="1">保存 1 天</option>
+          <option value="2">保存 2 天</option>
+          <option value="3">保存 3 天</option>
+          <option value="4">保存 4 天</option>
+          <option value="5">保存 5 天</option>
+          <option value="6">保存 6 天</option>
           <option value="7">保存 7 天</option>
-          <option value="30">保存 30 天</option>
         </select>
         <button id="loginBtn" style="width: 100%;">登录后台</button>
         <div id="msg"></div>
@@ -215,13 +220,14 @@
       <div class="row">
         <input id="dslug" placeholder="登录标识，如 mmm" style="width:150px" class="mono">
         <input id="dname" placeholder="分销商名称" style="width:150px">
-        <input id="dpw" placeholder="密码（可留空）" style="width:190px">
+        <input id="dpw" placeholder="密码（可留空，他自己设）" style="width:190px">
         <input id="dquota" type="number" placeholder="额度（个数）" style="width:120px" value="100">
         <select id="dparent" style="width:210px"><option value="">上级：总后台直属（第1级）</option></select>
         <button id="distCreateBtn">添加分销商</button>
         <span id="distMsg" class="muted"></span>
       </div>
-      <div class="row" style="margin-bottom:8px; margin-top:8px;"><input id="qDists" placeholder="搜索：标识 / 名称" oninput="applyFilter('qDists','distBody')" style="flex:1"></div>
+      <div class="muted" style="margin:8px 0">添加后，他的专用链接就是本站域名后面加 /标识，例如 https://你的域名/mmm。</div>
+      <div class="row" style="margin-bottom:8px"><input id="qDists" placeholder="搜索：标识 / 名称" oninput="applyFilter('qDists','distBody')" style="flex:1"></div>
       <table>
         <thead><tr><th>登录地址</th><th>额度</th><th>状态</th><th>操作</th><th>标识 / 名称</th></tr></thead>
         <tbody id="distBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
@@ -230,10 +236,11 @@
 
     <h2>进货流水</h2>
     <div class="card">
+      <div class="muted" style="margin-bottom:8px">谁给谁补了多少额度都在这里（最新的在上面）。</div>
       <div id="stockAll" class="muted">加载中…</div>
     </div>
 
-    <h2>游客客户（小火箭等）</h2>
+    <h2>游客客户（小火箭等第三方客户端）</h2>
     <div class="card">
       <div class="row">
         <input id="guser" placeholder="用户名（客户名）" style="width:150px">
@@ -250,7 +257,7 @@
         <button id="guestCreateBtn">添加游客</button>
         <span id="guestMsg" class="muted"></span>
       </div>
-      <div class="row" style="margin-bottom:8px; margin-top:8px;"><input id="qGuests" placeholder="搜索：用户名 / 备注" oninput="applyFilter('qGuests','guestBody')" style="flex:1"></div>
+      <div class="row" style="margin-bottom:8px; margin-top:8px"><input id="qGuests" placeholder="搜索：用户名 / 备注" oninput="applyFilter('qGuests','guestBody')" style="flex:1"></div>
       <table>
         <thead><tr><th>用户名 / 备注</th><th>专属页面</th><th>到期</th><th>状态</th><th>操作</th></tr></thead>
         <tbody id="guestBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
@@ -260,6 +267,7 @@
 </div>
 
 <script>
+// --- 核心业务逻辑与 API 请求 ---
 const $ = (id) => document.getElementById(id);
 const api = async (path, opts = {}) => {
   const sess = (() => { try { return localStorage.getItem("v2sess"); } catch { return null; } })();
@@ -279,19 +287,23 @@ const api = async (path, opts = {}) => {
   }
 };
 const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString("zh-CN", { hour12: false }) : "—";
+function esc(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+const pad2 = (n) => String(n).padStart(2, "0");
 
-// 登录成功后进入后台
+const devNoteMap = {};
+const guestLimitMap = {};
+const guestNameMap = {};
+
+// 登录与界面切换
 function enterConsole() {
-  $("loginBox").classList.remove("show"); // 隐藏登录弹窗
-  $("homeView").classList.add("hidden");  // 隐藏伪装的世界时钟
-  $("topClock").style.display = "block"; // 显示后台的右上角小时间
+  $("loginBox").classList.remove("show"); 
+  $("homeView").classList.add("hidden");  
   
-  // 修改左上角标题为后台模式
   $("brandTitle").textContent = "v2one999 授权后台";
   $("brandSub").textContent = "管理控制台";
   document.title = "v2one999 授权后台";
 
-  $("console").classList.remove("hidden"); // 显示主控制台
+  $("console").classList.remove("hidden");
   
   loadDevices();
   loadDists();
@@ -299,7 +311,6 @@ function enterConsole() {
   loadGuests();
 }
 
-// 登录请求
 async function doLogin() {
   const days = Number($("loginDays").value) || 1;
   const { status, data } = await api("/api/admin/login", {
@@ -307,10 +318,10 @@ async function doLogin() {
   });
   if (status === 200 && data.ok) {
     if (data.session) { try { localStorage.setItem("v2sess", data.session); localStorage.setItem("v2days", String(days)); } catch {} }
-    $("pw").value = ""; // 清空密码框
+    $("pw").value = ""; 
     enterConsole();
   } else {
-    $("msg").textContent = "密码不对";
+    $("msg").textContent = "密码错误";
   }
 }
 
@@ -318,7 +329,6 @@ try { const d = localStorage.getItem("v2days"); if (d) $("loginDays").value = d;
 $("loginBtn").onclick = doLogin;
 $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
 
-// 自动静默登录检测
 (async () => {
   for (let i = 0; i < 4; i++) {
     const { status, data } = await api("/api/admin/ping");
@@ -328,18 +338,16 @@ $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); }
   }
 })();
 
-// 点击头像展开/收起登录弹窗
+// 点击头像事件处理
 $("avatarBtn").addEventListener("click", (e) => {
-  e.stopPropagation(); // 阻止事件冒泡，防止触发全局关闭
+  e.stopPropagation();
   const lb = $("loginBox");
   lb.classList.toggle("show");
   if (lb.classList.contains("show")) {
-    $("msg").textContent = ""; // 每次打开清空错误提示
-    setTimeout(() => $("pw").focus(), 50); // 自动对焦输入框
+    $("msg").textContent = ""; 
+    setTimeout(() => $("pw").focus(), 50); 
   }
 });
-
-// 点击页面其他空白处，自动收起登录弹窗
 document.addEventListener("click", (e) => {
   const lb = $("loginBox");
   if (lb.classList.contains("show") && !lb.contains(e.target)) {
@@ -347,10 +355,37 @@ document.addEventListener("click", (e) => {
   }
 });
 
+// 表格过滤
+function applyFilter(inputId, bodyId) {
+  const input = $(inputId);
+  const body = $(bodyId);
+  if (!input || !body) return;
+  const q = (input.value || "").trim().toLowerCase();
+  const rows = [...body.querySelectorAll("tr")];
+  const real = rows.filter((tr) => !tr.querySelector("td[colspan]") && !tr.classList.contains("nomatch"));
+  let nm = body.querySelector("tr.nomatch");
+  if (!real.length) { if (nm) nm.remove(); return; }
+  let visible = 0;
+  for (const tr of real) {
+    const hit = !q || tr.textContent.toLowerCase().includes(q);
+    tr.style.display = hit ? "" : "none";
+    if (hit) visible++;
+  }
+  if (q && visible === 0) {
+    if (!nm) {
+      nm = document.createElement("tr");
+      nm.className = "nomatch";
+      nm.innerHTML = '<td colspan="9" class="muted">没有匹配的结果</td>';
+      body.appendChild(nm);
+    }
+    nm.style.display = "";
+  } else if (nm) nm.remove();
+}
+window.applyFilter = applyFilter;
 
-// ---- 以下为后台业务逻辑保留区域 (维持原有逻辑不变) ---- //
+// 1. 发卡与设备逻辑
 function machineOk(v) { return /^[0-9A-HJKMNP-TV-Z]{16}$/.test((v || "").toUpperCase().replace(/[\s-]/g, "")); }
-const BAD_MACHINE_MSG = "这不是机器码，像是激活码；机器码在客户端激活页上，格式是 XXXX-XXXX-XXXX-XXXX";
+const BAD_MACHINE_MSG = "这不是机器码，像是激活码；机器码在客户端激活页上";
 function durFields(valId, unitId) {
   const unit = $(unitId).value;
   if (unit === "perm") return { days: 0 };
@@ -360,113 +395,286 @@ $("issueBtn").onclick = async () => {
   const body = { machineCode: $("mc").value.trim(), ...durFields("durVal", "durUnit"), note: $("note").value.trim(), channel: $("channel").value, mode: "code" };
   if (!machineOk(body.machineCode)) { $("issueMsg").textContent = BAD_MACHINE_MSG; return; }
   const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
-  if (data.ok) { $("codeText").textContent = data.code; $("codeOut").classList.remove("hidden"); $("issueMsg").textContent = "";
+  if (data.ok) {
+    $("codeText").textContent = data.code;
+    $("codeOut").classList.remove("hidden");
+    $("issueMsg").textContent = "";
   } else $("issueMsg").textContent = "失败：" + (data.reason === "bad_machine" ? BAD_MACHINE_MSG : data.reason || "");
 };
 $("openBtn").onclick = async () => {
   const body = { machineCode: $("mc").value.trim(), ...durFields("durVal", "durUnit"), note: $("note").value.trim(), channel: $("channel").value, mode: "open" };
   if (!machineOk(body.machineCode)) { $("issueMsg").textContent = BAD_MACHINE_MSG; return; }
   const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
-  $("issueMsg").textContent = data.ok ? "已开通" : "失败：" + data.reason;
+  $("issueMsg").textContent = data.ok ? "已开通：让用户在客户端点直接开通即可" : "失败：" + data.reason;
   if (data.ok) loadDevices();
 };
 $("copyBtn").onclick = () => navigator.clipboard.writeText($("codeText").textContent);
 
 async function act(machine, action, days) {
-  if (action === "delete" && !confirm(`彻底删除设备 ${machine}？`)) return;
+  if (action === "delete" && !confirm(`彻底删除设备 ${machine}？它会从总表消失、授权一并抹掉，不可恢复。`)) return;
   const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action, days }) });
   if (!data.ok) alert("失败：" + (data.reason || ""));
   loadDevices();
 }
 window.act = act;
 
-const pad2 = (n) => String(n).padStart(2, "0");
-function localTimeText(ts) { const d = new Date(ts * 1000); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; }
+function localTimeText(ts) {
+  const d = new Date(ts * 1000);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
 async function editExpiry(machine, expiresAt) {
   const example = localTimeText(Math.floor(Date.now() / 1000) + 30 * 86400);
-  const v = prompt(`修改到期时间（当前：${expiresAt ? fmt(expiresAt) : "永久"}）\n格式：${example}\n填 0 = 永久`, expiresAt ? localTimeText(expiresAt) : "");
+  const v = prompt(`修改到期时间（当前：${expiresAt ? fmt(expiresAt) : "永久"}）\n按格式填，例如：${example}\n填 0 或“永久” = 改成永久`, expiresAt ? localTimeText(expiresAt) : "");
   if (v === null || v.trim() === "") return;
+  const t = v.trim();
   let exp = null;
-  if (v.trim() !== "0" && v.trim() !== "永久") {
-    const dt = new Date(v.trim().replace(/-/g, '/'));
-    if (isNaN(dt.getTime())) { alert("时间格式错误"); return; }
+  if (!(t === "0" || t === "永久" || t.toLowerCase() === "permanent")) {
+    const m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) { alert("格式不对"); return; }
+    const dt = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+    if (isNaN(dt.getTime())) { alert("时间不对"); return; }
     exp = Math.floor(dt.getTime() / 1000);
   }
   const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action: "set_expiry", expires_at: exp }) });
-  if (!data.ok) alert("失败");
+  if (!data.ok) alert("失败：" + (data.reason || ""));
   loadDevices();
 }
 window.editExpiry = editExpiry;
 
-const devNoteMap = {};
-function applyFilter(inputId, bodyId) {
-  const q = ($(inputId).value || "").trim().toLowerCase();
-  const rows = [...$(bodyId).querySelectorAll("tr")].filter(tr => !tr.querySelector("td[colspan]") && !tr.classList.contains("nomatch"));
-  let nm = $(bodyId).querySelector("tr.nomatch");
-  if (!rows.length) return;
-  let visible = 0;
-  for (const tr of rows) { const hit = !q || tr.textContent.toLowerCase().includes(q); tr.style.display = hit ? "" : "none"; if (hit) visible++; }
-  if (q && visible === 0) {
-    if (!nm) { nm = document.createElement("tr"); nm.className = "nomatch"; nm.innerHTML = '<td colspan="9" class="muted">没有匹配的结果</td>'; $(bodyId).appendChild(nm); }
-    nm.style.display = "";
-  } else if (nm) nm.remove();
-}
-window.applyFilter = applyFilter;
-
 async function editNote(machine) {
   const cur = devNoteMap[machine] || "";
-  const v = prompt(`修改备注（当前：${cur || "未填"}）：`, cur);
-  if (v !== null) { await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action: "set_note", note: v.trim() }) }); loadDevices(); }
+  const v = prompt(`客户名备注：`, cur);
+  if (v === null) return;
+  const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action: "set_note", note: v.trim() }) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  loadDevices();
 }
 window.editNote = editNote;
 
 function renderIssued(list) {
   if (!list.length) { $("issuedBody").innerHTML = '<tr><td colspan="6" class="muted">还没有发出过码</td></tr>'; return; }
   $("issuedBody").innerHTML = list.map((i) => `<tr>
-    <td class="mono">${i.machine || "—"}<div class="muted">${i.note || ""}</div></td>
+    <td class="mono">${i.machine || "—"}<div class="muted">${i.note || ""}</div>${i.attest_fail ? `<div style="color:#c62828">激活被拒：${i.attest_fail.reason}</div>` : ""}</td>
     <td data-label="天数">${i.duration_text || (i.days === 0 ? "永久" : i.days + " 天")}</td>
-    <td data-label="渠道">${i.channel === "dist" ? "分销" : "直营"}</td>
+    <td data-label="渠道">${i.channel === "dist" ? "分销" + (i.dist ? "(" + i.dist + ")" : "") : "直营"}</td>
     <td data-label="发出时间">${fmt(i.created_at)}</td>
     <td data-label="状态">${i.status === "open" ? "待领取" : "未激活"}</td>
     <td class="acts">${i.code ? `<button class="small ghost" onclick="copyIssued('${i.code}')">复制码</button> ` : ""}<button class="small danger" onclick="revokeCode('${i.licKey}')">作废</button></td></tr>`).join("");
 }
-window.revokeCode = async (licKey) => { if (confirm("确定作废？")) { await api("/api/admin/action", { method: "POST", body: JSON.stringify({ licKey, action: "revoke" }) }); loadDevices(); } };
-window.copyIssued = async (code) => { try { await navigator.clipboard.writeText(code); alert("已复制"); } catch { prompt("复制：", code); } };
+async function revokeCode(licKey) {
+  if (!confirm("确定作废此码？")) return;
+  const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ licKey, action: "revoke" }) });
+  if (!data.ok) alert("失败");
+  loadDevices();
+}
+window.revokeCode = revokeCode;
+async function copyIssued(code) { try { await navigator.clipboard.writeText(code); alert("已复制"); } catch { prompt("复制：", code); } }
+window.copyIssued = copyIssued;
 
 async function loadDevices() {
   const { status, data } = await api("/api/admin/devices");
   if (!data.ok) return;
+  const pb = $("pendingBox");
+  if (data.pending_open && data.pending_open.length) {
+    pb.classList.remove("hidden");
+    pb.innerHTML = "待领取开通：" + data.pending_open.join(", ");
+  } else pb.classList.add("hidden");
+  
   renderIssued(data.issued || []);
-  if (!data.devices.length) { $("tbody").innerHTML = '<tr><td colspan="9" class="muted">还没有设备</td></tr>'; return; }
+  applyFilter("qIssued", "issuedBody");
+  if (!data.devices.length) {
+    $("tbody").innerHTML = '<tr><td colspan="9" class="muted">还没有设备</td></tr>';
+    applyFilter("qDevices", "tbody");
+    return;
+  }
   $("tbody").innerHTML = data.devices.map((d) => {
-    const lic = d.lic || {}; devNoteMap[d.machine] = lic.note || "";
+    const lic = d.lic || {};
+    devNoteMap[d.machine] = lic.note || "";
+    const st = lic.status || "—";
+    const boot = d.integrity && d.integrity.boot && d.integrity.boot.deviceLocked === false
+      ? '<div class="muted" style="color:#b03a2e">设备已解锁/root 标记</div>' : "";
     return `<tr>
-      <td class="mono">${d.machine}</td>
-      <td data-label="客户名">${lic.note || '<span class="muted">未填</span>'}</td>
+      <td class="mono">${d.machine}<div class="muted">${lic.channel === "dist" ? "分销" : ""}${lic.dist ? "(" + lic.dist + ")" : ""}</div>${boot}</td>
+      <td data-label="客户名">${lic.note ? esc(lic.note) : '<span class="muted">未填</span>'}</td>
       <td data-label="平台">${d.platform || "—"}</td>
       <td data-label="激活">${fmt(lic.activated_at)}</td>
       <td data-label="到期">${lic.expires_at ? fmt(lic.expires_at) : (lic.days === 0 ? "永久" : "—")}</td>
       <td data-label="最近打开">${fmt(d.last_seen)}</td>
       <td data-label="拉取">${d.pulls}</td>
-      <td data-label="状态"><span class="tag">${lic.status || "—"}</span></td>
-      <td class="acts"><button class="small ghost" onclick="act('${d.machine}','unbind')">解绑</button>
-      <button class="small ghost" onclick="editExpiry('${d.machine}', ${lic.expires_at || 0})">改期</button>
-      <button class="small ghost" onclick="editNote('${d.machine}')">备注</button>
-      <button class="small danger" onclick="act('${d.machine}','delete')">删除</button></td></tr>`;
+      <td data-label="状态"><span class="tag ${st === "revoked" ? "revoked" : st === "issued" ? "issued" : ""}">${st}</span></td>
+      <td class="acts">
+        ${st === "revoked"
+          ? `<button class="small ghost" onclick="act('${d.machine}','restore')">恢复</button>`
+          : `<button class="small danger" onclick="act('${d.machine}','revoke')">停用</button>`}
+        <button class="small ghost" onclick="act('${d.machine}','unbind')">解绑</button>
+        <button class="small ghost" onclick="editExpiry('${d.machine}', ${lic.expires_at || 0})">改期</button>
+        <button class="small ghost" onclick="editNote('${d.machine}')">备注</button>
+        <button class="small danger" onclick="act('${d.machine}','delete')">删除</button>
+      </td></tr>`;
   }).join("");
+  applyFilter("qDevices", "tbody");
 }
 $("refreshBtn").onclick = loadDevices;
 
-async function loadDists() { /* 原分销商渲染逻辑 */ }
-async function loadStock() { /* 原进货渲染逻辑 */ }
-async function loadGuests() { /* 原游客渲染逻辑 */ }
+// 2. 分销商逻辑
+async function loadDists() {
+  const { data } = await api("/api/admin/dist");
+  if (!data.ok) { $("distBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
+  const dp = $("dparent");
+  if (dp) {
+    const curParent = dp.value;
+    dp.innerHTML = '<option value="">上级：总后台直属（第1级）</option>' + data.distributors
+      .filter((x) => (x.level || 1) < 5)
+      .map((x) => `<option value="${x.slug}">上级：${x.name || x.slug}（${x.slug}）</option>`).join("");
+    dp.value = [...dp.options].some((o) => o.value === curParent) ? curParent : "";
+  }
+  if (!data.distributors.length) {
+    $("distBody").innerHTML = '<tr><td colspan="5" class="muted">还没有分销商</td></tr>';
+    return;
+  }
+  $("distBody").innerHTML = data.distributors.map((d) => `<tr>
+    <td class="mono" data-label="登录地址">${location.origin}/${d.slug}</td>
+    <td data-label="额度">${d.used} / ${d.quota < 0 ? "不限" : d.quota}<div class="muted">客户 ${d.users ? d.users.devices : 0} 台</div></td>
+    <td data-label="状态">${!d.has_pw ? "待他设密码" : (d.status === "active" ? "正常" : "已停用")}</td>
+    <td class="acts">${d.status === "active"
+      ? `<button class="small danger" onclick="distAct('${d.slug}','disable')">停用</button>`
+      : `<button class="small ghost" onclick="distAct('${d.slug}','enable')">恢复</button>
+         <button class="small danger" onclick="distAct('${d.slug}','delete')">删除</button>`}
+      <button class="small ghost" onclick="distAct('${d.slug}','resetpw')">重置密码</button>
+      <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button></td>
+    <td class="mono" data-label="标识 / 名称">${d.slug}<div class="muted">${d.name || ""}</div></td></tr>`).join("");
+  applyFilter("qDists", "distBody");
+}
+async function distAct(slug, action) {
+  const body = { slug, action };
+  if (action === "resetpw" && !confirm(`重置密码？`)) return;
+  if (action === "delete" && !confirm(`彻底删除分销商 ${slug}？`)) return;
+  if (action === "quota") {
+    const q = prompt(`分销商 ${slug} 的总额度（个数，-1 = 不限）：`);
+    if (q === null || q === "") return;
+    body.quota = Number(q);
+  }
+  const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify(body) });
+  if (!data.ok) alert("失败");
+  loadDists();
+}
+window.distAct = distAct;
 
-</script>
+$("distCreateBtn").onclick = async () => {
+  const body = {
+    action: "create",
+    slug: $("dslug").value.trim().toLowerCase(),
+    name: $("dname").value.trim(),
+    password: $("dpw").value,
+    quota: Number($("dquota").value || 100),
+    parent: $("dparent").value || undefined,
+  };
+  if (!body.slug) { $("distMsg").textContent = "标识必填"; return; }
+  const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify(body) });
+  $("distMsg").textContent = data.ok ? "添加成功" : "失败：" + data.reason;
+  if (data.ok) loadDists();
+};
 
-<script>
-// --- 世界时钟与基础时间逻辑 ---
+async function loadStock() {
+  const { data } = await api("/api/admin/stock");
+  if (!data.ok) { $("stockAll").textContent = "加载失败"; return; }
+  $("stockAll").innerHTML = data.stock.length
+    ? data.stock.slice(0, 30).map((x) => `<div>${fmt(x.at)} · ${x.from === "admin" ? "总后台" : "分销商 " + x.from} 给 <b>${x.dist}</b> 补了 <b>+${x.delta}</b> 个额度</div>`).join("")
+    : "还没有进货记录";
+}
+
+// 3. 游客逻辑
+async function loadGuests() {
+  const { data } = await api("/api/admin/guest");
+  if (!data.ok) { $("guestBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
+  if (!data.guests.length) {
+    $("guestBody").innerHTML = '<tr><td colspan="5" class="muted">还没有游客客户</td></tr>';
+    return;
+  }
+  $("guestBody").innerHTML = data.guests.map((g) => {
+    const page = `${location.origin}/g/${g.id}`;
+    const st = g.status === "disabled" ? "已停用" : (g.expired ? "已到期" : "正常");
+    guestLimitMap[g.id] = g.fetch ? g.fetch.daily_limit : 10;
+    guestNameMap[g.id] = g.username || "";
+    return `<tr>
+    <td>${g.username}<div class="muted">${g.note || ""}${g.channel === "dist" ? " · 分销" : ""}</div></td>
+    <td class="mono" data-label="专属页面">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
+    <td data-label="到期">${g.expires_at ? fmt(g.expires_at) : "永久"}</td>
+    <td data-label="状态">${st}<div class="muted">今日拉取 ${g.fetch ? g.fetch.fetch_day_count : 0}/${g.fetch && g.fetch.daily_limit === 0 ? "不限" : (g.fetch ? g.fetch.daily_limit : 10)} 次</div></td>
+    <td class="acts">${g.status === "disabled"
+      ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>
+         <button class="small danger" onclick="guestAct('${g.id}','delete')">删除</button>`
+      : `<button class="small danger" onclick="guestAct('${g.id}','disable')">停用</button>`}
+      <button class="small ghost" onclick="editGuestExpiry('${g.id}', ${g.expires_at || 0})">改期</button>
+      <button class="small ghost" onclick="guestLimit('${g.id}')">拉取上限</button>
+      <button class="small ghost" onclick="guestAct('${g.id}','password')">改密码</button></td></tr>`;
+  }).join("");
+  applyFilter("qGuests", "guestBody");
+}
+async function copyGuestPage(page) { try { await navigator.clipboard.writeText(page); alert("已复制"); } catch { prompt("复制：", page); } }
+window.copyGuestPage = copyGuestPage;
+
+async function guestLimit(id) {
+  const cur = guestLimitMap[id];
+  const v = prompt(`每日拉取上限（0 = 不限），留空 = 默认10`, cur === 0 ? "0" : String(cur ?? 10));
+  if (v === null) return;
+  const t = v.trim();
+  const body = { id, action: "set_limit", daily_limit: t === "" ? null : Number(t) };
+  const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify(body) });
+  if (!data.ok) alert("失败");
+  loadGuests();
+}
+window.guestLimit = guestLimit;
+
+async function guestAct(id, action) {
+  const body = { id, action };
+  if (action === "delete" && !confirm("彻底删除？")) return;
+  if (action === "password") {
+    const p = prompt("新密码：");
+    if (p === null || p === "") return;
+    body.password = p;
+  }
+  const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify(body) });
+  if (!data.ok) alert("失败");
+  loadGuests();
+}
+window.guestAct = guestAct;
+
+function localTimeTextSec(ts) {
+  const d = new Date(ts * 1000);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+async function editGuestExpiry(id, expiresAt) {
+  const v = prompt(`修改到期时间：\n按格式填：2026-11-04 01:17:44\n填 0 = 永久`, expiresAt ? localTimeTextSec(expiresAt) : "");
+  if (v === null || v.trim() === "") return;
+  let exp = null;
+  if (v.trim() !== "0" && v.trim() !== "永久") {
+    const dt = new Date(v.trim().replace(/-/g, '/'));
+    if (isNaN(dt.getTime())) return;
+    exp = Math.floor(dt.getTime() / 1000);
+  }
+  const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify({ id, action: "set_expiry", expires_at: exp }) });
+  if (!data.ok) alert("失败");
+  loadGuests();
+}
+window.editGuestExpiry = editGuestExpiry;
+
+$("guestCreateBtn").onclick = async () => {
+  const body = {
+    action: "create",
+    username: $("guser").value.trim(),
+    password: $("gpw").value,
+    ...durFields("gdurVal", "gdurUnit"),
+    note: $("gnote").value.trim(),
+    daily_limit: $("glimit").value === "" ? undefined : Number($("glimit").value),
+  };
+  const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify(body) });
+  $("guestMsg").textContent = data.ok ? "添加成功" : "失败：" + data.reason;
+  if (data.ok) loadGuests();
+};
+
+// --- 世界时钟展示逻辑 ---
 (() => {
-  // 定义要在主页展示的世界城市
   const worldCities = [
     { id: "bj", name: "北京 / 亚洲", tz: "Asia/Shanghai" },
     { id: "ty", name: "东京 / 亚洲", tz: "Asia/Tokyo" },
@@ -476,7 +684,6 @@ async function loadGuests() { /* 原游客渲染逻辑 */ }
     { id: "sy", name: "悉尼 / 澳洲", tz: "Australia/Sydney" }
   ];
 
-  // 初始化世界时钟网格 HTML
   const wcGrid = document.getElementById("worldClocksGrid");
   if (wcGrid) {
     wcGrid.innerHTML = worldCities.map(c => `
@@ -490,26 +697,21 @@ async function loadGuests() { /* 原游客渲染逻辑 */ }
 
   const t = document.getElementById("clockTime"), d = document.getElementById("clockDate");
   const wk = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-  const p2 = (n) => String(n).padStart(2, "0");
-
+  
   const tick = () => {
-    // 1. 更新后台右上角的小时钟（本地时间）
     const now = new Date();
-    if (t) t.textContent = p2(now.getHours()) + ":" + p2(now.getMinutes()) + ":" + p2(now.getSeconds());
-    if (d) d.textContent = now.getFullYear() + "-" + p2(now.getMonth() + 1) + "-" + p2(now.getDate()) + " " + wk[now.getDay()];
+    if (t) t.textContent = pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":" + pad2(now.getSeconds());
+    if (d) d.textContent = now.getFullYear() + "-" + pad2(now.getMonth() + 1) + "-" + pad2(now.getDate()) + " " + wk[now.getDay()];
 
-    // 2. 更新主页的世界时钟表盘（仅当主页显示时执行以省性能）
     if (!document.getElementById("homeView").classList.contains("hidden")) {
       worldCities.forEach(c => {
         const timeEl = document.getElementById(`wt-${c.id}`);
         const dateEl = document.getElementById(`wd-${c.id}`);
-        
         if(timeEl) timeEl.textContent = now.toLocaleString("zh-CN", { timeZone: c.tz, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         if(dateEl) dateEl.textContent = now.toLocaleString("zh-CN", { timeZone: c.tz, month: 'short', day: 'numeric', weekday: 'short' });
       });
     }
   };
-  
   tick(); setInterval(tick, 1000);
 })();
 </script>
