@@ -9,7 +9,7 @@
   * { box-sizing: border-box; }
   body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; color: var(--ink);
     background: linear-gradient(180deg, #eaf3ff 0, #f7f9fc 240px, #f7f9fc 100%); min-height: 100vh; display: flex; flex-direction: column; }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 18px 16px 48px; flex: 1; width: 100%; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 18px 16px 0; flex: 1; width: 100%; display: flex; flex-direction: column; }
 
   /* 顶部导航条 */
   .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 18px; }
@@ -54,6 +54,8 @@
     from { opacity: 0; transform: scale(0.95); }
     to { opacity: 1; transform: scale(1); }
   }
+  
+  #homeView { display: flex; flex-direction: column; flex: 1; }
 
   /* 默认的世界时钟面板 */
   .world-clocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 10px; }
@@ -86,8 +88,8 @@
   .faq-text p { margin-top: 0; margin-bottom: 12px; }
   .faq-text strong { color: #1c2333; }
 
-  /* 伪装页脚 */
-  .fake-footer { text-align: center; color: #a0aec0; font-size: 12px; padding: 24px 16px; margin-top: 30px; border-top: 1px solid #e6ebf2; }
+  /* 伪装页脚 - 靠底部对齐 */
+  .fake-footer { text-align: center; color: #a0aec0; font-size: 12px; padding: 24px 16px; margin-top: auto; border-top: 1px solid #e6ebf2; }
   .fake-footer a { color: #a0aec0; text-decoration: none; margin: 0 8px; }
 
   h2 { font-size: 15px; margin: 26px 0 10px; color: #223; display: flex; align-items: center; gap: 8px; }
@@ -115,7 +117,7 @@
   #msg { margin: 10px 0 0; color: #b03a2e; min-height: 18px; font-size: 13px; text-align: center; }
 
   @media (max-width: 640px) {
-    .wrap { padding: 14px 10px 20px; }
+    .wrap { padding: 14px 10px 0; }
     .card { padding: 12px; }
     .row { flex-direction: column; align-items: stretch; }
     .row input, .row select, .row button { width: 100% !important; min-width: 0 !important; flex: none !important; box-sizing: border-box; }
@@ -157,12 +159,10 @@
         <div id="clockTime" class="clock-time">--:--:--</div>
         <div id="clockDate" class="clock-date"></div>
       </div>
-      <!-- 右上角小人头像 (加入了 pointer-events: none 防止 SVG 阻挡点击) -->
       <button id="avatarBtn" class="avatar" title="菜单" aria-label="菜单">
         <svg style="pointer-events: none;" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="#fff"/><path d="M4 20c1.2-3.4 4.2-5 8-5s6.8 1.6 8 5" fill="#fff"/></svg>
       </button>
 
-      <!-- 隐藏在头像下的密码输入框弹窗 -->
       <div id="loginBox" class="login-popover">
         <div style="font-weight: 700; font-size: 16px; margin-bottom: 12px; color: #1c2333;">安全通道验证</div>
         <input id="pw" type="password" placeholder="请输入访问密钥" style="margin-bottom: 10px;">
@@ -180,17 +180,13 @@
 
   <!-- 默认首页：世界时钟视图 (伪装面板) -->
   <div id="homeView">
-    <div class="world-clocks" id="worldClocksGrid">
-      <!-- 时钟卡片由 JS 动态生成 -->
-    </div>
+    <div class="world-clocks" id="worldClocksGrid"></div>
     
-    <!-- 第 1 排挂件：市场 与 计时器 -->
+    <!-- 第 1 排挂件 -->
     <div class="home-widgets">
       <div class="card widget-card">
         <div class="widget-title">🌐 主要金融市场状态</div>
-        <div class="market-list" id="marketList">
-          <!-- JS 动态渲染开盘/收盘状态 -->
-        </div>
+        <div class="market-list" id="marketList"></div>
       </div>
       <div class="card widget-card">
         <div class="widget-title">⏱️ 快捷专注计时器</div>
@@ -205,7 +201,7 @@
       </div>
     </div>
 
-    <!-- 第 2 排挂件：填补垂直高度的新模块 -->
+    <!-- 第 2 排挂件 -->
     <div class="home-widgets">
       <div class="card widget-card">
         <div class="widget-title">🌍 本地网络同步状态</div>
@@ -228,8 +224,31 @@
       </div>
     </div>
 
-    <!-- 第 3 块：用于彻底撑开底部的大块科普文本 -->
-    <div class="card widget-card" style="margin-top: 16px; margin-bottom: 24px;">
+    <!-- 第 3 排挂件：电脑版专属的超大填充内容 -->
+    <div class="home-widgets">
+      <div class="card widget-card">
+        <div class="widget-title">👨‍💻 开发者工具：实时 Unix 时间戳</div>
+        <div class="market-list">
+          <div class="timer-display" id="unixTimeDisplay" style="font-size: 28px; margin: 10px 0; color: var(--blue);">1730000000</div>
+          <div class="market-item"><span>当前毫秒级时间戳</span><span id="unixTimeMs" style="color:#7a8699; font-family:monospace;">1730000000000</span></div>
+          <div class="market-item"><span>ISO 8601 标准格式</span><span id="isoTime" style="color:#7a8699; font-family:monospace;">获取中...</span></div>
+          <p style="font-size: 12px; color: #a0aec0; text-align: center; margin-top: 15px;">用于开发测试与服务器日志时间校准</p>
+        </div>
+      </div>
+      
+      <div class="card widget-card">
+        <div class="widget-title">🗓️ 近期全球主要公共假日</div>
+        <div class="market-list">
+          <div class="market-item"><span>感恩节 (美国)</span><span style="color:var(--amber);">2026年11月26日</span></div>
+          <div class="market-item"><span>圣诞节 (全球多国)</span><span style="color:var(--red);">2026年12月25日</span></div>
+          <div class="market-item"><span>元旦 (全球)</span><span style="color:var(--green);">2027年1月1日</span></div>
+          <div class="market-item"><span>春节 (亚洲多国)</span><span style="color:var(--red);">2027年2月6日</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第 4 块：大块科普文本 -->
+    <div class="card widget-card" style="margin-top: 16px; margin-bottom: 30px;">
       <div class="widget-title">📖 关于世界时间工具与时区科普</div>
       <div class="faq-text">
         <p><strong>1. 什么是协调世界时 (UTC)？</strong><br>协调世界时（UTC）是目前全球通用的时间标准。它以原子时秒长为基础，在时刻上尽量接近于格林尼治标准时间（GMT）。我们网站上的所有时钟均与国际原子时服务器保持毫秒级同步，确保您看到的每一个数字都绝对精准。</p>
@@ -239,15 +258,14 @@
       </div>
     </div>
     
-    <!-- 增加真实感的页脚 -->
     <footer class="fake-footer">
       © 2026 World Time Tool. All rights reserved. <br>
       <a href="#">隐私政策</a> | <a href="#">服务条款</a> | <a href="#">时区说明</a> | <a href="#">API 文档</a>
     </footer>
   </div>
 
-  <!-- 后台主界面 (登录后才显示) -->
-  <div id="console" class="hidden">
+  <!-- 后台主界面 -->
+  <div id="console" class="hidden" style="margin-bottom: 40px;">
     <div class="row" style="justify-content:flex-end;margin:2px 0 6px">
       <a href="/summary.html" style="text-decoration:none"><button class="small">📊 本月汇总</button></a>
     </div>
@@ -354,7 +372,7 @@
 </div>
 
 <script>
-// --- 后台核心业务逻辑 ---
+// --- 后台核心业务逻辑 (完整保留) ---
 const $ = (id) => document.getElementById(id);
 const api = async (path, opts = {}) => {
   const sess = (() => { try { return localStorage.getItem("v2sess"); } catch { return null; } })();
@@ -381,7 +399,6 @@ const devNoteMap = {};
 const guestLimitMap = {};
 const guestNameMap = {};
 
-// 登录进入控制台
 function enterConsole() {
   $("loginBox").classList.remove("show"); 
   $("homeView").classList.add("hidden");  
@@ -425,7 +442,6 @@ $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); }
   }
 })();
 
-// 点击头像事件处理
 $("avatarBtn").addEventListener("click", (e) => {
   e.stopPropagation();
   const lb = $("loginBox");
@@ -442,7 +458,6 @@ document.addEventListener("click", (e) => {
   }
 });
 
-// 表格过滤
 function applyFilter(inputId, bodyId) {
   const input = $(inputId);
   const body = $(bodyId);
@@ -762,7 +777,7 @@ $("guestCreateBtn").onclick = async () => {
 };
 
 
-// --- 前端展示类 JS (世界时钟 / 市场状态 / 倒计时 / 假IP) ---
+// --- 前端展示类 JS ---
 (() => {
   // 1. 生成假 IP 显得真实
   const fakeIpEl = document.getElementById('fakeIp');
@@ -836,9 +851,9 @@ $("guestCreateBtn").onclick = async () => {
     });
     ml.innerHTML = html;
   };
-  renderMarkets(); // 初始化执行一次
+  renderMarkets();
 
-  // 4. 时间循环更新
+  // 4. 时间与时间戳循环更新
   const t = document.getElementById("clockTime"), d = document.getElementById("clockDate");
   const wk = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
   
@@ -848,12 +863,21 @@ $("guestCreateBtn").onclick = async () => {
     if (d) d.textContent = now.getFullYear() + "-" + pad2(now.getMonth() + 1) + "-" + pad2(now.getDate()) + " " + wk[now.getDay()];
 
     if (!document.getElementById("homeView").classList.contains("hidden")) {
+      // 传统世界时钟
       worldCities.forEach(c => {
         const timeEl = document.getElementById(`wt-${c.id}`);
         const dateEl = document.getElementById(`wd-${c.id}`);
         if(timeEl) timeEl.textContent = now.toLocaleString("zh-CN", { timeZone: c.tz, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         if(dateEl) dateEl.textContent = now.toLocaleString("zh-CN", { timeZone: c.tz, month: 'short', day: 'numeric', weekday: 'short' });
       });
+      
+      // 更新 Unix 时间戳 (秒与毫秒)
+      const uDisp = document.getElementById("unixTimeDisplay");
+      if(uDisp) uDisp.textContent = Math.floor(now.getTime() / 1000);
+      const uMs = document.getElementById("unixTimeMs");
+      if(uMs) uMs.textContent = now.getTime();
+      const isoT = document.getElementById("isoTime");
+      if(isoT) isoT.textContent = now.toISOString();
     }
   };
   tick(); setInterval(tick, 1000);
