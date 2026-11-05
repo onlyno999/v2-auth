@@ -5,27 +5,30 @@ import { finishActivation } from "./activate.js";
 // Direct-open flow: admin pre-opened this machine in the console; the
 // user taps "I have paid" and claims the device token.
 //
-// Reinstall recovery (owner, 2026-11-05): a direct-open customer who
-// deletes and reinstalls the app lost his token with the app data —
-// and claim used to serve ONLY never-claimed ("open") licenses, so
-// the reinstalled app was told "not opened" while the console showed
-// a live, unexpired license; the owner had to re-authorize the
-// machine by hand every time. A CODELESS license (code_enc null —
-// direct-open issues carry no code) now stays claimable for its
-// machine in "open", "active" and post-unbind "issued" states:
-// finishActivation re-issues a fresh token (the old one dies) and
-// KEEPS the original activated_at/expires_at, so a re-claim never
-// extends the term. The build binding does the guarding: a
-// reinstall of the genuine build presents the same signer digest
-// and passes; a repackaged build is refused signer_mismatch.
-// Licenses WITH a code are never claimable — their recovery is
-// re-entering the code, which /api/activate already allows for
-// active licenses.
+// Reinstall recovery (owner, 2026-11-05): a customer who deletes
+// and reinstalls the app loses his token with the app data — and
+// claim used to serve ONLY never-claimed ("open") licenses, so
+// the reinstalled app was told "not opened" while the console
+// showed a live, unexpired license; the owner had to re-
+// authorize the machine by hand every time. The first fix tried
+// to keep code-issued licenses out of claim (recovery = re-enter
+// the code) — and promptly locked out the owner's OWN phone,
+// whose license was code/legacy-issued: the backend had him
+// authorized, tapping direct-open still said "not opened".
+// Final rule: the machine binding IS the authorization. Any
+// license bound to this machine in "open", "active" or post-
+// unbind "issued" state is claimable; finishActivation issues a
+// fresh token (the old one dies) and KEEPS the original
+// activated_at/expires_at, so a re-claim never extends the
+// term. The guards are the build binding (a genuine reinstall
+// presents the same signer digest; a repackaged build gets
+// signer_mismatch) and the rate limit below — a machine code
+// is an identity the customer shares with his seller, not a
+// secret, and a stolen re-claim wins nothing durable: the
+// owner re-claims in one tap or revokes from the console.
 function claimable(lic, machine) {
   if (!lic || lic.machine !== machine) return false;
-  if (lic.status === "open") return true;
-  if ((lic.status === "active" || lic.status === "issued") && !lic.code_enc) return true;
-  return false;
+  return lic.status === "open" || lic.status === "active" || lic.status === "issued";
 }
 
 export async function onRequestPost({ request, env }) {
