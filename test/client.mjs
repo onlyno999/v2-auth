@@ -156,7 +156,7 @@ const dev3 = await newDeviceKey();
 const claim3 = await j("/api/claim", { machineCode: M3, pubkey: dev3.pubkey, platform: "android-test" });
 check("claim direct-open ok", open3.status === 200 && claim3.status === 200 && !!claim3.data.token);
 const claimAgain = await j("/api/claim", { machineCode: M3, pubkey: dev3.pubkey });
-check("second claim rejected", claimAgain.status === 404);
+check("second claim is a reinstall re-claim (new contract)", claimAgain.status === 200 && !!claimAgain.data.token && claimAgain.data.token !== claim3.data.token);
 
 // revoke / restore / expire
 const revoke = await j("/api/admin/action", { machineCode: M1, action: "revoke" }, { cookie });
