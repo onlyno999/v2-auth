@@ -24,6 +24,11 @@
     background: linear-gradient(135deg, var(--teal), var(--blue)); border: 2px solid #fff;
     box-shadow: 0 4px 14px rgba(30,120,200,.35); }
   .avatar:active { transform: scale(.96); }
+  .topright { display: flex; align-items: center; gap: 12px; flex: none; }
+  .clock { text-align: right; line-height: 1.25; }
+  .clock-time { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .5px; }
+  .clock-date { color: #7a8699; font-size: 12px; }
+  @media (max-width: 640px) { .clock-time { font-size: 15px; } .clock-date { font-size: 11px; } }
 
   h2 { font-size: 15px; margin: 26px 0 10px; color: #223; display: flex; align-items: center; gap: 8px; }
   h2::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, var(--blue), var(--violet)); flex: none; }
@@ -84,9 +89,15 @@
         <div class="brandsub">管理控制台</div>
       </div>
     </div>
-    <button id="avatarBtn" class="avatar" title="管理员登录" aria-label="管理员登录">
+    <div class="topright">
+      <div class="clock">
+        <div id="clockTime" class="clock-time">--:--:--</div>
+        <div id="clockDate" class="clock-date"></div>
+      </div>
+      <button id="avatarBtn" class="avatar" title="管理员登录" aria-label="管理员登录">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="#fff"/><path d="M4 20c1.2-3.4 4.2-5 8-5s6.8 1.6 8 5" fill="#fff"/></svg>
     </button>
+    </div>
   </header>
 
   <div id="loginBox" class="card login-card">
@@ -663,6 +674,17 @@ $("guestCreateBtn").onclick = async () => {
 };
 </script>
 <script>
+(() => {
+  const t = document.getElementById("clockTime"), d = document.getElementById("clockDate");
+  const wk = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  const p2 = (n) => String(n).padStart(2, "0");
+  const tick = () => {
+    const now = new Date();
+    if (t) t.textContent = p2(now.getHours()) + ":" + p2(now.getMinutes()) + ":" + p2(now.getSeconds());
+    if (d) d.textContent = now.getFullYear() + "-" + p2(now.getMonth() + 1) + "-" + p2(now.getDate()) + " " + wk[now.getDay()];
+  };
+  tick(); setInterval(tick, 1000);
+})();
 document.getElementById("avatarBtn").addEventListener("click", () => {
   const lb = document.getElementById("loginBox");
   if (lb && !lb.classList.contains("hidden")) {
