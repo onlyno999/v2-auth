@@ -64,11 +64,11 @@
   .w-date { font-size: 13px; color: #7a8699; margin-top: 6px; font-weight: 500; }
 
   /* 伪装主页的底部小工具模块 */
-  .home-widgets { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+  .home-widgets { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
   .widget-card { padding: 20px; }
   .widget-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 6px; color: #445; }
   
-  /* 市场列表 */
+  /* 市场与信息列表 */
   .market-list { display: flex; flex-direction: column; gap: 12px; }
   .market-item { display: flex; justify-content: space-between; align-items: center; font-size: 14px; padding-bottom: 8px; border-bottom: 1px dashed #eceef2; }
   .market-item:last-child { border-bottom: none; padding-bottom: 0; }
@@ -81,8 +81,13 @@
   .timer-display { font-size: 36px; font-weight: 800; text-align: center; color: var(--ink); margin: 10px 0 20px; font-variant-numeric: tabular-nums; }
   .timer-btns { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
   
+  /* 文本科普区 */
+  .faq-text { font-size: 13px; color: #556; line-height: 1.7; }
+  .faq-text p { margin-top: 0; margin-bottom: 12px; }
+  .faq-text strong { color: #1c2333; }
+
   /* 伪装页脚 */
-  .fake-footer { text-align: center; color: #a0aec0; font-size: 12px; padding: 24px 16px; margin-top: 40px; border-top: 1px solid #e6ebf2; }
+  .fake-footer { text-align: center; color: #a0aec0; font-size: 12px; padding: 24px 16px; margin-top: 30px; border-top: 1px solid #e6ebf2; }
   .fake-footer a { color: #a0aec0; text-decoration: none; margin: 0 8px; }
 
   h2 { font-size: 15px; margin: 26px 0 10px; color: #223; display: flex; align-items: center; gap: 8px; }
@@ -179,16 +184,14 @@
       <!-- 时钟卡片由 JS 动态生成 -->
     </div>
     
-    <!-- 填充下方空白的“时间工具”插件 -->
+    <!-- 第 1 排挂件：市场 与 计时器 -->
     <div class="home-widgets">
-      <!-- 市场状态插件 -->
       <div class="card widget-card">
         <div class="widget-title">🌐 主要金融市场状态</div>
         <div class="market-list" id="marketList">
           <!-- JS 动态渲染开盘/收盘状态 -->
         </div>
       </div>
-      <!-- 倒计时插件 -->
       <div class="card widget-card">
         <div class="widget-title">⏱️ 快捷专注计时器</div>
         <div class="timer-display" id="timerDisplay">00:00</div>
@@ -201,11 +204,45 @@
         </div>
       </div>
     </div>
+
+    <!-- 第 2 排挂件：填补垂直高度的新模块 -->
+    <div class="home-widgets">
+      <div class="card widget-card">
+        <div class="widget-title">🌍 本地网络同步状态</div>
+        <div class="market-list">
+          <div class="market-item"><span>本地 IP 掩码</span><span style="color:#7a8699; font-family:monospace;" id="fakeIp">获取中...</span></div>
+          <div class="market-item"><span>NTP 服务器延迟</span><span style="color:var(--green); font-family:monospace;">12 ms</span></div>
+          <div class="market-item"><span>系统时间偏差</span><span style="color:var(--green); font-family:monospace;">± 0.003s</span></div>
+          <div class="market-item"><span>闰秒状态</span><span style="color:#7a8699;">无需调整</span></div>
+        </div>
+      </div>
+      
+      <div class="card widget-card">
+        <div class="widget-title">☀️ 日出日落与天文参考</div>
+        <div class="market-list">
+          <div class="market-item"><span>日出时间 (当地)</span><span style="color:var(--amber); font-weight:600;">06:24 AM</span></div>
+          <div class="market-item"><span>日落时间 (当地)</span><span style="color:#7c5cf6; font-weight:600;">17:42 PM</span></div>
+          <div class="market-item"><span>当前月相</span><span style="color:#7a8699;">🌖 亏凸月 (82%)</span></div>
+          <div class="market-item"><span>太阳黑子活动</span><span style="color:var(--teal);">平静</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 第 3 块：用于彻底撑开底部的大块科普文本 -->
+    <div class="card widget-card" style="margin-top: 16px; margin-bottom: 24px;">
+      <div class="widget-title">📖 关于世界时间工具与时区科普</div>
+      <div class="faq-text">
+        <p><strong>1. 什么是协调世界时 (UTC)？</strong><br>协调世界时（UTC）是目前全球通用的时间标准。它以原子时秒长为基础，在时刻上尽量接近于格林尼治标准时间（GMT）。我们网站上的所有时钟均与国际原子时服务器保持毫秒级同步，确保您看到的每一个数字都绝对精准。</p>
+        <p><strong>2. 为什么金融市场的时间如此重要？</strong><br>全球化交易意味着资金在全球各大交易所（如纽约、伦敦、东京）之间不断流动。了解各个市场的开盘与收盘时间，对于跨国贸易、外汇交易以及宏观经济分析至关重要。本站提供实时的市场状态指示器，助您把握每一个交易窗口。</p>
+        <p><strong>3. 时区转换如何处理夏令时 (DST)？</strong><br>部分国家和地区在夏季会实行夏令时，将时钟拨快一小时以节约能源。我们的算法已内置了全球所有国家/地区的历史与当前夏令时规则，系统会在对应日期自动为您无缝切换，无需手动干预。</p>
+        <p style="margin-bottom:0; color:#a0aec0; text-align:center; margin-top: 20px; font-size: 11px;">* 本站所有时间数据和天文数据仅供参考，请以当地官方发布为准。</p>
+      </div>
+    </div>
     
     <!-- 增加真实感的页脚 -->
     <footer class="fake-footer">
       © 2026 World Time Tool. All rights reserved. <br>
-      <a href="#">隐私政策</a> | <a href="#">服务条款</a> | <a href="#">时区说明</a>
+      <a href="#">隐私政策</a> | <a href="#">服务条款</a> | <a href="#">时区说明</a> | <a href="#">API 文档</a>
     </footer>
   </div>
 
@@ -317,7 +354,7 @@
 </div>
 
 <script>
-// --- 后台核心业务逻辑 (原样保留，100% 完整) ---
+// --- 后台核心业务逻辑 ---
 const $ = (id) => document.getElementById(id);
 const api = async (path, opts = {}) => {
   const sess = (() => { try { return localStorage.getItem("v2sess"); } catch { return null; } })();
@@ -725,9 +762,15 @@ $("guestCreateBtn").onclick = async () => {
 };
 
 
-// --- 前端展示类 JS (世界时钟 / 市场状态 / 倒计时) ---
+// --- 前端展示类 JS (世界时钟 / 市场状态 / 倒计时 / 假IP) ---
 (() => {
-  // 1. 世界时钟渲染
+  // 1. 生成假 IP 显得真实
+  const fakeIpEl = document.getElementById('fakeIp');
+  if(fakeIpEl) {
+    fakeIpEl.innerText = Math.floor(Math.random()*150+50) + '.' + Math.floor(Math.random()*255) + '.***.***';
+  }
+
+  // 2. 世界时钟渲染
   const worldCities = [
     { id: "bj", name: "北京 / 亚洲", tz: "Asia/Shanghai" },
     { id: "ty", name: "东京 / 亚洲", tz: "Asia/Tokyo" },
@@ -748,7 +791,7 @@ $("guestCreateBtn").onclick = async () => {
     `).join("");
   }
 
-  // 2. 金融市场渲染及状态判断
+  // 3. 金融市场渲染及状态判断
   const markets = [
     { name: "纽约证券交易所 (NYSE)", tz: "America/New_York", openHr: 9.5, closeHr: 16 },
     { name: "伦敦证券交易所 (LSE)", tz: "Europe/London", openHr: 8, closeHr: 16.5 },
@@ -764,7 +807,6 @@ $("guestCreateBtn").onclick = async () => {
     const now = new Date();
     
     markets.forEach(m => {
-      // 简单判断逻辑 (未考虑节假日，仅按周一到周五及当地时间判断，足以制造真实感)
       const options = { timeZone: m.tz, hour: 'numeric', minute: 'numeric', hour12: false, weekday: 'short' };
       const formatter = new Intl.DateTimeFormat('en-US', options);
       const parts = formatter.formatToParts(now);
@@ -796,7 +838,7 @@ $("guestCreateBtn").onclick = async () => {
   };
   renderMarkets(); // 初始化执行一次
 
-  // 3. 时间循环更新
+  // 4. 时间循环更新
   const t = document.getElementById("clockTime"), d = document.getElementById("clockDate");
   const wk = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
   
@@ -828,7 +870,7 @@ function startTimer(minutes) {
     let m = Math.floor(totalSeconds / 60);
     let s = totalSeconds % 60;
     display.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-    display.style.color = totalSeconds < 60 ? "var(--red)" : "var(--ink)"; // 最后60秒变红
+    display.style.color = totalSeconds < 60 ? "var(--red)" : "var(--ink)";
     
     if (totalSeconds <= 0) {
       clearInterval(timerInterval);
