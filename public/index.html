@@ -116,6 +116,7 @@
       <a href="/summary.html" style="text-decoration:none"><button class="small">📊 本月汇总</button></a>
       <button id="logoutBtn" class="ghost small" type="button">退出登录</button>
     </div>
+    <div id="expiryBox" class="card hidden" style="border:1px solid #e8b13a;background:#fffbe9"></div>
     <h2>给新用户激活</h2>
     <div class="card">
       <div class="row">
@@ -441,6 +442,31 @@ async function copyIssued(code) {
 }
 window.copyIssued = copyIssued;
 
+function renderExpiryBox(devices) {
+  const box = $("expiryBox");
+  const now = Math.floor(Date.now() / 1000);
+  const rows = [];
+  for (const d of devices || []) {
+    const lic = d.lic || {};
+    if (!lic.expires_at || lic.status === "revoked") continue;
+    const left = lic.expires_at - now;
+    if (left > 7 * 86400) continue;
+    rows.push({ machine: d.machine, note: lic.note || "", exp: lic.expires_at, left });
+  }
+  if (!rows.length) { box.classList.add("hidden"); box.innerHTML = ""; return; }
+  rows.sort((a, b) => a.exp - b.exp);
+  const over = rows.filter((r) => r.left <= 0).length;
+  const soon = rows.length - over;
+  const line = (r) => {
+    const when = r.left <= 0
+      ? `<span style="color:#c62828;font-weight:600">已过期 ${Math.max(0, Math.floor(-r.left / 86400))} 天</span>`
+      : `<span style="color:#b26a00;font-weight:600">还剩 ${Math.ceil(r.left / 86400)} 天</span>`;
+    return `<div style="padding:3px 0;border-top:1px dashed #e3d9ae">${when} · ${r.note ? esc(r.note) : '<span class="muted">未填备注</span>'} · <span class="mono">${r.machine}</span> · 到期 ${fmt(r.exp)}</div>`;
+  };
+  box.innerHTML = `<div style="font-weight:700;margin-bottom:2px">⏰ 临期提醒：已过期 ${over} 台 · 7 天内到期 ${soon} 台 <span class="muted" style="font-weight:400">（照这个名单联系客户续期）</span></div>` + rows.map(line).join("");
+  box.classList.remove("hidden");
+}
+
 async function loadDevices() {
   const { status, data } = await api("/api/admin/devices");
   if (!data.ok) {
@@ -457,6 +483,7 @@ async function loadDevices() {
   renderIssued(data.issued || []);
   applyFilter("qIssued", "issuedBody");
   if (!data.devices.length) {
+    renderExpiryBox([]);
     $("tbody").innerHTML = '<tr><td colspan="9" class="muted">还没有设备</td></tr>';
     applyFilter("qDevices", "tbody");
     return;
@@ -486,6 +513,7 @@ async function loadDevices() {
         <button class="small danger" onclick="act('${d.machine}','delete')">删除</button>
       </td></tr>`;
   }).join("");
+  renderExpiryBox(data.devices);
   applyFilter("qDevices", "tbody");
 }
 $("refreshBtn").onclick = loadDevices;
