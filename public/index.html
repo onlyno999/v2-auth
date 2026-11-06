@@ -3,107 +3,46 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>世界时间工具</title>
+<title>v2one999 授权后台</title>
 <style>
-  :root { --ink:#1c2333; --blue:#2f7cf6; --violet:#7c5cf6; --teal:#12b5a5; --amber:#f5a623; --red:#e5484d; --green:#22733a; }
+  :root { --ink:#1c2333; --blue:#2f7cf6; --violet:#7c5cf6; --teal:#12b5a5; --amber:#f5a623; --red:#e5484d; }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; color: var(--ink);
-    background: linear-gradient(180deg, #eaf3ff 0, #f7f9fc 240px, #f7f9fc 100%); min-height: 100vh; display: flex; flex-direction: column; }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 18px 16px 0; flex: 1; width: 100%; display: flex; flex-direction: column; }
+    background: linear-gradient(180deg, #eaf3ff 0, #f7f9fc 240px, #f7f9fc 100%); min-height: 100vh; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 18px 16px 48px; }
 
-  /* 顶部导航条 */
+  /* Top bar: brand left, avatar (login entry) right */
   .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 18px; }
   .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
   .logo { width: 44px; height: 44px; flex: none; border-radius: 14px; display: flex; align-items: center; justify-content: center;
     background: linear-gradient(135deg, var(--blue), var(--violet)); color: #fff; font-size: 22px; font-weight: 800;
     box-shadow: 0 6px 16px rgba(64,110,246,.35); }
-  .brand h1 { font-size: 20px; margin: 0; line-height: 1.2; transition: all 0.3s;}
+  .brand h1 { font-size: 20px; margin: 0; line-height: 1.2; }
   .brandsub { color: #7a8699; font-size: 12px; margin-top: 2px; }
-  
-  .topright { display: flex; align-items: center; gap: 12px; flex: none; position: relative; }
-  .clock { text-align: right; line-height: 1.25; }
-  .clock-time { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .5px; }
-  .clock-date { color: #7a8699; font-size: 12px; }
-  
-  /* 头像按钮 */
   .avatar { width: 44px; height: 44px; flex: none; border-radius: 50%; padding: 0; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     background: linear-gradient(135deg, var(--teal), var(--blue)); border: 2px solid #fff;
-    box-shadow: 0 4px 14px rgba(30,120,200,.35); transition: transform 0.15s; }
+    box-shadow: 0 4px 14px rgba(30,120,200,.35); }
   .avatar:active { transform: scale(.96); }
-
-  /* 隐藏在右上角的登录弹窗 */
-  .login-popover {
-    position: absolute;
-    top: 56px;
-    right: 0;
-    width: 280px;
-    background: #fff;
-    border: 1px solid #e6ebf2;
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 10px 30px rgba(30,60,120,.15);
-    display: none;
-    flex-direction: column;
-    z-index: 1000;
-    animation: popDown 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-    transform-origin: top right;
-  }
-  .login-popover.show { display: flex; }
-  @keyframes popDown {
-    from { opacity: 0; transform: scale(0.95); }
-    to { opacity: 1; transform: scale(1); }
-  }
-  
-  #homeView { display: flex; flex-direction: column; flex: 1; }
-
-  /* 默认的世界时钟面板 */
-  .world-clocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 10px; }
-  .w-clock-card { background: #fff; border: 1px solid #e6ebf2; border-radius: 14px; padding: 24px 20px; text-align: center; box-shadow: 0 4px 18px rgba(30,60,120,.06); position: relative; overflow: hidden; }
-  .w-clock-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--blue), var(--violet)); opacity: 0.8; }
-  .w-city { font-size: 18px; font-weight: 700; color: #1c2333; margin-bottom: 8px; }
-  .w-time { font-size: 32px; font-weight: 800; color: var(--blue); font-variant-numeric: tabular-nums; letter-spacing: 1px; }
-  .w-date { font-size: 13px; color: #7a8699; margin-top: 6px; font-weight: 500; }
-
-  /* 伪装主页的底部小工具模块 */
-  .home-widgets { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
-  .widget-card { padding: 20px; }
-  .widget-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 6px; color: #445; }
-  
-  /* 市场与信息列表 */
-  .market-list { display: flex; flex-direction: column; gap: 12px; }
-  .market-item { display: flex; justify-content: space-between; align-items: center; font-size: 14px; padding-bottom: 8px; border-bottom: 1px dashed #eceef2; }
-  .market-item:last-child { border-bottom: none; padding-bottom: 0; }
-  .market-status { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; }
-  .dot.open { background-color: var(--green); box-shadow: 0 0 6px rgba(34,115,58,.4); }
-  .dot.closed { background-color: #a0aec0; }
-  
-  /* 倒计时 */
-  .timer-display { font-size: 36px; font-weight: 800; text-align: center; color: var(--ink); margin: 10px 0 20px; font-variant-numeric: tabular-nums; }
-  .timer-btns { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
-  
-  /* 文本科普区 */
-  .faq-text { font-size: 13px; color: #556; line-height: 1.7; }
-  .faq-text p { margin-top: 0; margin-bottom: 12px; }
-  .faq-text strong { color: #1c2333; }
-
-  /* 伪装页脚 - 靠底部对齐 */
-  .fake-footer { text-align: center; color: #a0aec0; font-size: 12px; padding: 24px 16px; margin-top: auto; border-top: 1px solid #e6ebf2; }
-  .fake-footer a { color: #a0aec0; text-decoration: none; margin: 0 8px; }
+  .topright { display: flex; align-items: center; gap: 12px; flex: none; }
+  .clock { text-align: right; line-height: 1.25; }
+  .clock-time { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .5px; }
+  .clock-date { color: #7a8699; font-size: 12px; }
+  @media (max-width: 640px) { .clock-time { font-size: 15px; } .clock-date { font-size: 11px; } }
 
   h2 { font-size: 15px; margin: 26px 0 10px; color: #223; display: flex; align-items: center; gap: 8px; }
   h2::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, var(--blue), var(--violet)); flex: none; }
   .card { background: #fff; border: 1px solid #e6ebf2; border-radius: 14px; padding: 16px; box-shadow: 0 4px 18px rgba(30,60,120,.06); }
-  
-  input, select { padding: 9px 11px; border: 1px solid #ccd6e4; border-radius: 9px; font-size: 14px; background: #fff; width: 100%; box-sizing: border-box; }
+  .login-card { max-width: 520px; margin: 8px auto 4px; padding: 22px 20px;
+    background: linear-gradient(180deg, #ffffff, #f2f7ff); border-color: #d9e6fb; }
+  .login-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+  input, select { padding: 9px 11px; border: 1px solid #ccd6e4; border-radius: 9px; font-size: 14px; background: #fff; }
   input:focus, select:focus { outline: 2px solid rgba(47,124,246,.35); border-color: var(--blue); }
   button { padding: 9px 15px; border: 0; border-radius: 9px; background: linear-gradient(135deg, var(--blue), var(--violet)); color: #fff; font-size: 14px; cursor: pointer; box-shadow: 0 3px 10px rgba(64,110,246,.25); }
   button.ghost { background: #eef2f8; color: #1c2333; box-shadow: none; }
   button.danger { background: var(--red); box-shadow: none; }
   button.small { padding: 5px 10px; font-size: 12px; margin-right: 4px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eef1f5; vertical-align: top; }
   th { color: #667; font-weight: 600; }
@@ -113,22 +52,19 @@
   .tag.revoked { background: #fdecea; color: #b03a2e; }
   .tag.issued { background: #eef2fb; color: #33519c; }
   .muted { color: #889; font-size: 12px; }
-  .hidden { display: none !important; }
-  #msg { margin: 10px 0 0; color: #b03a2e; min-height: 18px; font-size: 13px; text-align: center; }
+  .hidden { display: none; }
+  #msg { margin: 10px 0 0; color: #b03a2e; min-height: 18px; }
 
+  /* Mobile (<=640px): tables turn into stacked cards (same behaviour as
+     before, recoloured); forms stack full-width. Desktop untouched. */
   @media (max-width: 640px) {
-    .wrap { padding: 14px 10px 0; }
+    .wrap { padding: 14px 10px 40px; }
     .card { padding: 12px; }
+    .login-card { padding: 18px 14px; }
     .row { flex-direction: column; align-items: stretch; }
     .row input, .row select, .row button { width: 100% !important; min-width: 0 !important; flex: none !important; box-sizing: border-box; }
-    
-    .home-widgets { grid-template-columns: 1fr; } /* 移动端双栏变单栏叠加 */
-    
-    .login-popover { position: fixed; top: 76px; left: 16px; right: 16px; width: auto; transform-origin: top center; }
-    
-    .clock { display: none; } /* 移动端隐藏顶部时钟 */
-    .brand h1 { font-size: 18px; }
-    
+    .code { max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; font-size: 17px; }
+    .mono { overflow-wrap: anywhere; }
     table, tbody, tr, td, th { display: block; width: 100%; box-sizing: border-box; }
     thead { display: none; }
     tbody tr { border: 1px solid #e2e5ec; border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
@@ -149,123 +85,33 @@
     <div class="brand">
       <div class="logo">V</div>
       <div>
-        <h1 id="brandTitle">世界时间工具</h1>
-        <div class="brandsub" id="brandSub">全球时钟与效率套件</div>
+        <h1>v2one999 授权后台</h1>
+        <div class="brandsub">管理控制台</div>
       </div>
     </div>
-    
     <div class="topright">
-      <div class="clock" id="topClock">
+      <div class="clock">
         <div id="clockTime" class="clock-time">--:--:--</div>
         <div id="clockDate" class="clock-date"></div>
       </div>
-      <button id="avatarBtn" class="avatar" title="菜单" aria-label="菜单">
-        <svg style="pointer-events: none;" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="#fff"/><path d="M4 20c1.2-3.4 4.2-5 8-5s6.8 1.6 8 5" fill="#fff"/></svg>
-      </button>
-
-      <div id="loginBox" class="login-popover">
-        <div style="font-weight: 700; font-size: 16px; margin-bottom: 12px; color: #1c2333;">安全通道验证</div>
-        <input id="pw" type="password" placeholder="请输入访问密钥" style="margin-bottom: 10px;">
-        <select id="loginDays" title="保持连接" style="margin-bottom: 12px;">
-          <option value="1">授权 1 天</option>
-          <option value="2">授权 2 天</option>
-          <option value="3">授权 3 天</option>
-          <option value="7">授权 7 天</option>
-        </select>
-        <button id="loginBtn" style="width: 100%;">进入控制台</button>
-        <div id="msg"></div>
-      </div>
+      <button id="avatarBtn" class="avatar" title="管理员登录" aria-label="管理员登录">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="#fff"/><path d="M4 20c1.2-3.4 4.2-5 8-5s6.8 1.6 8 5" fill="#fff"/></svg>
+    </button>
     </div>
   </header>
 
-  <!-- 默认首页：世界时钟视图 (伪装面板) -->
-  <div id="homeView">
-    <div class="world-clocks" id="worldClocksGrid"></div>
-    
-    <!-- 第 1 排挂件 -->
-    <div class="home-widgets">
-      <div class="card widget-card">
-        <div class="widget-title">🌐 主要金融市场状态</div>
-        <div class="market-list" id="marketList"></div>
-      </div>
-      <div class="card widget-card">
-        <div class="widget-title">⏱️ 快捷专注计时器</div>
-        <div class="timer-display" id="timerDisplay">00:00</div>
-        <div class="timer-btns">
-          <button class="small ghost" onclick="startTimer(5)">5分钟</button>
-          <button class="small ghost" onclick="startTimer(15)">15分钟</button>
-          <button class="small ghost" onclick="startTimer(30)">30分钟</button>
-          <button class="small ghost" onclick="startTimer(60)">1小时</button>
-          <button class="small danger" onclick="stopTimer()">重置</button>
-        </div>
-      </div>
+  <div id="loginBox" class="card login-card">
+    <div class="login-title">管理员登录</div>
+    <div class="muted" style="margin-bottom:12px">点右上角头像也可回到这里；输入密码进入后台</div>
+    <div class="row">
+      <input id="pw" type="password" placeholder="管理员密码" style="flex:1;min-width:200px">
+      <select id="loginDays" title="密码保存天数"><option value="1">保存 1 天</option><option value="2">保存 2 天</option><option value="3">保存 3 天</option><option value="4">保存 4 天</option><option value="5">保存 5 天</option><option value="6">保存 6 天</option><option value="7">保存 7 天</option></select>
+      <button id="loginBtn">登录</button>
     </div>
-
-    <!-- 第 2 排挂件 -->
-    <div class="home-widgets">
-      <div class="card widget-card">
-        <div class="widget-title">🌍 本地网络同步状态</div>
-        <div class="market-list">
-          <div class="market-item"><span>本地 IP 掩码</span><span style="color:#7a8699; font-family:monospace;" id="fakeIp">获取中...</span></div>
-          <div class="market-item"><span>NTP 服务器延迟</span><span style="color:var(--green); font-family:monospace;">12 ms</span></div>
-          <div class="market-item"><span>系统时间偏差</span><span style="color:var(--green); font-family:monospace;">± 0.003s</span></div>
-          <div class="market-item"><span>闰秒状态</span><span style="color:#7a8699;">无需调整</span></div>
-        </div>
-      </div>
-      
-      <div class="card widget-card">
-        <div class="widget-title">☀️ 日出日落与天文参考</div>
-        <div class="market-list">
-          <div class="market-item"><span>日出时间 (当地)</span><span style="color:var(--amber); font-weight:600;">06:24 AM</span></div>
-          <div class="market-item"><span>日落时间 (当地)</span><span style="color:#7c5cf6; font-weight:600;">17:42 PM</span></div>
-          <div class="market-item"><span>当前月相</span><span style="color:#7a8699;">🌖 亏凸月 (82%)</span></div>
-          <div class="market-item"><span>太阳黑子活动</span><span style="color:var(--teal);">平静</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 第 3 排挂件：电脑版专属的超大填充内容 -->
-    <div class="home-widgets">
-      <div class="card widget-card">
-        <div class="widget-title">👨‍💻 开发者工具：实时 Unix 时间戳</div>
-        <div class="market-list">
-          <div class="timer-display" id="unixTimeDisplay" style="font-size: 28px; margin: 10px 0; color: var(--blue);">1730000000</div>
-          <div class="market-item"><span>当前毫秒级时间戳</span><span id="unixTimeMs" style="color:#7a8699; font-family:monospace;">1730000000000</span></div>
-          <div class="market-item"><span>ISO 8601 标准格式</span><span id="isoTime" style="color:#7a8699; font-family:monospace;">获取中...</span></div>
-          <p style="font-size: 12px; color: #a0aec0; text-align: center; margin-top: 15px;">用于开发测试与服务器日志时间校准</p>
-        </div>
-      </div>
-      
-      <div class="card widget-card">
-        <div class="widget-title">🗓️ 近期全球主要公共假日</div>
-        <div class="market-list">
-          <div class="market-item"><span>感恩节 (美国)</span><span style="color:var(--amber);">2026年11月26日</span></div>
-          <div class="market-item"><span>圣诞节 (全球多国)</span><span style="color:var(--red);">2026年12月25日</span></div>
-          <div class="market-item"><span>元旦 (全球)</span><span style="color:var(--green);">2027年1月1日</span></div>
-          <div class="market-item"><span>春节 (亚洲多国)</span><span style="color:var(--red);">2027年2月6日</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 第 4 块：大块科普文本 -->
-    <div class="card widget-card" style="margin-top: 16px; margin-bottom: 30px;">
-      <div class="widget-title">📖 关于世界时间工具与时区科普</div>
-      <div class="faq-text">
-        <p><strong>1. 什么是协调世界时 (UTC)？</strong><br>协调世界时（UTC）是目前全球通用的时间标准。它以原子时秒长为基础，在时刻上尽量接近于格林尼治标准时间（GMT）。我们网站上的所有时钟均与国际原子时服务器保持毫秒级同步，确保您看到的每一个数字都绝对精准。</p>
-        <p><strong>2. 为什么金融市场的时间如此重要？</strong><br>全球化交易意味着资金在全球各大交易所（如纽约、伦敦、东京）之间不断流动。了解各个市场的开盘与收盘时间，对于跨国贸易、外汇交易以及宏观经济分析至关重要。本站提供实时的市场状态指示器，助您把握每一个交易窗口。</p>
-        <p><strong>3. 时区转换如何处理夏令时 (DST)？</strong><br>部分国家和地区在夏季会实行夏令时，将时钟拨快一小时以节约能源。我们的算法已内置了全球所有国家/地区的历史与当前夏令时规则，系统会在对应日期自动为您无缝切换，无需手动干预。</p>
-        <p style="margin-bottom:0; color:#a0aec0; text-align:center; margin-top: 20px; font-size: 11px;">* 本站所有时间数据和天文数据仅供参考，请以当地官方发布为准。</p>
-      </div>
-    </div>
-    
-    <footer class="fake-footer">
-      © 2026 World Time Tool. All rights reserved. <br>
-      <a href="#">隐私政策</a> | <a href="#">服务条款</a> | <a href="#">时区说明</a> | <a href="#">API 文档</a>
-    </footer>
+    <div id="msg"></div>
   </div>
 
-  <!-- 后台主界面 -->
-  <div id="console" class="hidden" style="margin-bottom: 40px;">
+  <div id="console" class="hidden">
     <div class="row" style="justify-content:flex-end;margin:2px 0 6px">
       <a href="/summary.html" style="text-decoration:none"><button class="small">📊 本月汇总</button></a>
       <button id="logoutBtn" class="ghost small" type="button">退出登录</button>
@@ -319,6 +165,7 @@
         <thead><tr><th>机器码 / 备注</th><th>天数</th><th>渠道</th><th>发出时间</th><th>状态</th><th>操作</th></tr></thead>
         <tbody id="issuedBody"><tr><td colspan="6" class="muted">加载中…</td></tr></tbody>
       </table>
+      <div class="muted" style="margin-top:8px">客户在客户端输码激活后，会自动出现在上面的设备总表里。新发的码带「复制码」按钮，随时能复制重发；更早发的老码只存了哈希、调不回来，丢了就作废旧的、重新生成一个。</div>
     </div>
 
     <h2>分销商管理</h2>
@@ -332,7 +179,7 @@
         <button id="distCreateBtn">添加分销商</button>
         <span id="distMsg" class="muted"></span>
       </div>
-      <div class="muted" style="margin:8px 0">添加后，他的专用链接就是本站域名后面加 /标识。</div>
+      <div class="muted" style="margin:8px 0">添加后，他的专用链接就是本站域名后面加 /标识，例如 https://你的域名/mmm —— 密码不用你管：他第一次打开链接时自己设置（存服务器，你看不到）；他只能给自己客户发码（走分销订阅）、看自己的客户；发码扣额度，最多 365 天。</div>
       <div class="row" style="margin-bottom:8px"><input id="qDists" placeholder="搜索：标识 / 名称" oninput="applyFilter('qDists','distBody')" style="flex:1"></div>
       <table>
         <thead><tr><th>登录地址</th><th>额度</th><th>状态</th><th>操作</th><th>标识 / 名称</th></tr></thead>
@@ -342,7 +189,7 @@
 
     <h2>进货流水</h2>
     <div class="card">
-      <div class="muted" style="margin-bottom:8px">谁给谁补了多少额度都在这里（最新的在上面）。</div>
+      <div class="muted" style="margin-bottom:8px">谁给谁补了多少额度都在这里（最新的在上面）。分销商之间的补货也会记——钱他们线下结，你这里能看到全网的进货动态。</div>
       <div id="stockAll" class="muted">加载中…</div>
     </div>
 
@@ -359,11 +206,12 @@
           <option value="perm">永久</option>
         </select>
         <input id="gnote" placeholder="备注（可空）" style="width:140px">
-        <input id="glimit" type="number" min="0" max="999" placeholder="每日拉取上限" style="width:120px">
+        <input id="glimit" type="number" min="0" max="999" placeholder="每日拉取上限（默认10，0=不限）" style="width:220px">
         <button id="guestCreateBtn">添加游客</button>
         <span id="guestMsg" class="muted"></span>
       </div>
-      <div class="row" style="margin-bottom:8px; margin-top:8px"><input id="qGuests" placeholder="搜索：用户名 / 备注" oninput="applyFilter('qGuests','guestBody')" style="flex:1"></div>
+      <div class="muted" style="margin:8px 0">添加后把「专属页面」链接发给客户：他打开先输密码，进去只能看到自己还剩多少天、复制他自己的订阅链接，真实订阅地址不显示。停用 / 到期后他的订阅链接立刻失效；删除要先停用。</div>
+      <div class="row" style="margin-bottom:8px"><input id="qGuests" placeholder="搜索：用户名 / 备注" oninput="applyFilter('qGuests','guestBody')" style="flex:1"></div>
       <table>
         <thead><tr><th>用户名 / 备注</th><th>专属页面</th><th>到期</th><th>状态</th><th>操作</th></tr></thead>
         <tbody id="guestBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
@@ -373,9 +221,13 @@
 </div>
 
 <script>
-// --- 后台核心业务逻辑 (完整保留) ---
 const $ = (id) => document.getElementById(id);
 const api = async (path, opts = {}) => {
+  // GETs auto-retry: on a flaky phone connection a single dropped
+  // request used to leave the tables stuck on 加载失败.
+  // The session token rides in localStorage (x-session header) as well
+  // as the cookie: a refresh must never ask for the password again
+  // while the token (30 days) is still valid.
   const sess = (() => { try { return localStorage.getItem("v2sess"); } catch { return null; } })();
   const tries = !opts.method || opts.method === "GET" ? 3 : 1;
   for (let i = 0; i < tries; i++) {
@@ -393,29 +245,15 @@ const api = async (path, opts = {}) => {
   }
 };
 const fmt = (ts) => ts ? new Date(ts * 1000).toLocaleString("zh-CN", { hour12: false }) : "—";
-function esc(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-const pad2 = (n) => String(n).padStart(2, "0");
-
-const devNoteMap = {};
-const guestLimitMap = {};
-const guestNameMap = {};
 
 function enterConsole() {
-  $("loginBox").classList.remove("show"); 
-  $("homeView").classList.add("hidden");  
-  
-  $("brandTitle").textContent = "v2one999 授权后台";
-  $("brandSub").textContent = "管理控制台";
-  document.title = "v2one999 授权后台";
-
+  $("loginBox").classList.add("hidden");
   $("console").classList.remove("hidden");
-  
   loadDevices();
   loadDists();
   loadStock();
   loadGuests();
 }
-
 async function doLogin() {
   const days = Number($("loginDays").value) || 1;
   const { status, data } = await api("/api/admin/login", {
@@ -423,13 +261,11 @@ async function doLogin() {
   });
   if (status === 200 && data.ok) {
     if (data.session) { try { localStorage.setItem("v2sess", data.session); localStorage.setItem("v2days", String(days)); } catch {} }
-    $("pw").value = ""; 
     enterConsole();
   } else {
-    $("msg").textContent = "密码错误";
+    $("msg").textContent = "密码不对";
   }
 }
-
 async function doLogout() {
   try {
     await fetch("/api/admin/logout", {
@@ -442,14 +278,20 @@ async function doLogout() {
   try { localStorage.removeItem("v2sess"); } catch {}
   location.reload();
 }
-
 try { const d = localStorage.getItem("v2days"); if (d) $("loginDays").value = d; } catch {}
 $("loginBtn").onclick = doLogin;
 $("logoutBtn").onclick = doLogout;
 $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
-
+// Auto-login on load: if a still-valid session exists (cookie or the
+// stored token), go straight into the console — no password prompt.
+// A failed CHECK (network blip, deployment swap) is not a logout:
+// only a clean 401 leaves the login form up; anything else retries
+// for a few seconds first. (Field complaint: one refresh during a
+// deploy demanded the password despite a valid 30-day token.)
 (async () => {
   for (let i = 0; i < 4; i++) {
+    // Session check only (zero KV cost); the tables load once,
+    // inside enterConsole.
     const { status, data } = await api("/api/admin/ping");
     if (data && data.ok) { enterConsole(); return; }
     if (status === 401) return;
@@ -457,22 +299,84 @@ $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); }
   }
 })();
 
-$("avatarBtn").addEventListener("click", (e) => {
-  e.stopPropagation();
-  const lb = $("loginBox");
-  lb.classList.toggle("show");
-  if (lb.classList.contains("show")) {
-    $("msg").textContent = ""; 
-    setTimeout(() => $("pw").focus(), 50); 
-  }
-});
-document.addEventListener("click", (e) => {
-  const lb = $("loginBox");
-  if (lb.classList.contains("show") && !lb.contains(e.target)) {
-    lb.classList.remove("show");
-  }
-});
+function machineOk(v) {
+  // Machine codes are 16 Crockford chars grouped XXXX-XXXX-XXXX-XXXX
+  // (no I/L/O/U). An activation code (V2O-…) must never land here.
+  return /^[0-9A-HJKMNP-TV-Z]{16}$/.test((v || "").toUpperCase().replace(/[\s-]/g, ""));
+}
+const BAD_MACHINE_MSG = "这不是机器码，像是激活码；机器码在客户端激活页上，格式是 XXXX-XXXX-XXXX-XXXX";
+function durFields(valId, unitId) {
+  const unit = $(unitId).value;
+  if (unit === "perm") return { days: 0 };
+  return { durationValue: Number($(valId).value || 0), durationUnit: unit };
+}
+$("issueBtn").onclick = async () => {
+  const body = { machineCode: $("mc").value.trim(), ...durFields("durVal", "durUnit"), note: $("note").value.trim(), channel: $("channel").value, mode: "code" };
+  if (!machineOk(body.machineCode)) { $("issueMsg").textContent = BAD_MACHINE_MSG; return; }
+  const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
+  if (data.ok) {
+    $("codeText").textContent = data.code;
+    $("codeOut").classList.remove("hidden");
+    $("issueMsg").textContent = "";
+  } else $("issueMsg").textContent = "失败：" + (data.reason === "bad_machine" ? BAD_MACHINE_MSG : data.reason || "");
+};
+$("openBtn").onclick = async () => {
+  const body = { machineCode: $("mc").value.trim(), ...durFields("durVal", "durUnit"), note: $("note").value.trim(), channel: $("channel").value, mode: "open" };
+  if (!machineOk(body.machineCode)) { $("issueMsg").textContent = BAD_MACHINE_MSG; return; }
+  const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
+  $("issueMsg").textContent = data.ok
+    ? "已开通：让用户在客户端点「直接开通（卖家已开通时点这里）」即可进入"
+    : "失败：" + (data.reason === "bad_machine" ? BAD_MACHINE_MSG : data.reason || "");
+  if (data.ok) loadDevices();
+};
+$("copyBtn").onclick = () => navigator.clipboard.writeText($("codeText").textContent);
 
+async function act(machine, action, days) {
+  if (action === "delete" && !confirm(`彻底删除设备 ${machine}？它会从总表消失、授权一并抹掉，不可恢复；这台机器再想用要重新发码。`)) return;
+  const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action, days }) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  loadDevices();
+}
+window.act = act;
+
+// Manual expiry edit: type the exact moment the license should end
+// (local time), or 0 / 永久 to make it permanent. A past moment is
+// allowed and expires the license immediately.
+const pad2 = (n) => String(n).padStart(2, "0");
+function localTimeText(ts) {
+  const d = new Date(ts * 1000);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+async function editExpiry(machine, expiresAt) {
+  // The format example is generated live (now + 30 days): a frozen
+  // literal looked like a real stored date and confused the seller.
+  const example = localTimeText(Math.floor(Date.now() / 1000) + 30 * 86400);
+  const v = prompt(
+    `修改到期时间（当前：${expiresAt ? fmt(expiresAt) : "永久"}）\n按这个格式填，例如：${example}\n填 0 或“永久” = 改成永久`,
+    expiresAt ? localTimeText(expiresAt) : "");
+  if (v === null || v.trim() === "") return;
+  const t = v.trim();
+  let exp = null;
+  if (!(t === "0" || t === "永久" || t.toLowerCase() === "permanent")) {
+    const m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) { alert("格式不对，按 " + example + " 这样填"); return; }
+    const dt = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+    if (isNaN(dt.getTime())) { alert("这个时间不对，检查一下"); return; }
+    exp = Math.floor(dt.getTime() / 1000);
+  }
+  const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action: "set_expiry", expires_at: exp }) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  loadDevices();
+}
+window.editExpiry = editExpiry;
+
+const devNoteMap = {};
+// Client-side table search (owner, 2026-11-04: the lists will
+// grow — every table gets a search box). Purely visual: rows are
+// hidden, never removed, and each loader re-applies its filter
+// after rendering, so actions and reloads keep working exactly
+// as before. Matching is against the row's visible text — machine
+// code, customer name, slug, status words all hit.
 function applyFilter(inputId, bodyId) {
   const input = $(inputId);
   const body = $(bodyId);
@@ -500,67 +404,10 @@ function applyFilter(inputId, bodyId) {
 }
 window.applyFilter = applyFilter;
 
-// --- 1. 设备列表与授权逻辑 ---
-function machineOk(v) { return /^[0-9A-HJKMNP-TV-Z]{16}$/.test((v || "").toUpperCase().replace(/[\s-]/g, "")); }
-const BAD_MACHINE_MSG = "这不是机器码，像是激活码；机器码在客户端激活页上";
-function durFields(valId, unitId) {
-  const unit = $(unitId).value;
-  if (unit === "perm") return { days: 0 };
-  return { durationValue: Number($(valId).value || 0), durationUnit: unit };
-}
-$("issueBtn").onclick = async () => {
-  const body = { machineCode: $("mc").value.trim(), ...durFields("durVal", "durUnit"), note: $("note").value.trim(), channel: $("channel").value, mode: "code" };
-  if (!machineOk(body.machineCode)) { $("issueMsg").textContent = BAD_MACHINE_MSG; return; }
-  const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
-  if (data.ok) {
-    $("codeText").textContent = data.code;
-    $("codeOut").classList.remove("hidden");
-    $("issueMsg").textContent = "";
-  } else $("issueMsg").textContent = "失败：" + (data.reason === "bad_machine" ? BAD_MACHINE_MSG : data.reason || "");
-};
-$("openBtn").onclick = async () => {
-  const body = { machineCode: $("mc").value.trim(), ...durFields("durVal", "durUnit"), note: $("note").value.trim(), channel: $("channel").value, mode: "open" };
-  if (!machineOk(body.machineCode)) { $("issueMsg").textContent = BAD_MACHINE_MSG; return; }
-  const { data } = await api("/api/admin/issue", { method: "POST", body: JSON.stringify(body) });
-  $("issueMsg").textContent = data.ok ? "已开通：让用户在客户端点直接开通即可" : "失败：" + data.reason;
-  if (data.ok) loadDevices();
-};
-$("copyBtn").onclick = () => navigator.clipboard.writeText($("codeText").textContent);
-
-async function act(machine, action, days) {
-  if (action === "delete" && !confirm(`彻底删除设备 ${machine}？它会从总表消失、授权一并抹掉，不可恢复。`)) return;
-  const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action, days }) });
-  if (!data.ok) alert("失败：" + (data.reason || ""));
-  loadDevices();
-}
-window.act = act;
-
-function localTimeText(ts) {
-  const d = new Date(ts * 1000);
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-async function editExpiry(machine, expiresAt) {
-  const example = localTimeText(Math.floor(Date.now() / 1000) + 30 * 86400);
-  const v = prompt(`修改到期时间（当前：${expiresAt ? fmt(expiresAt) : "永久"}）\n按格式填，例如：${example}\n填 0 或“永久” = 改成永久`, expiresAt ? localTimeText(expiresAt) : "");
-  if (v === null || v.trim() === "") return;
-  const t = v.trim();
-  let exp = null;
-  if (!(t === "0" || t === "永久" || t.toLowerCase() === "permanent")) {
-    const m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-    if (!m) { alert("格式不对"); return; }
-    const dt = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
-    if (isNaN(dt.getTime())) { alert("时间不对"); return; }
-    exp = Math.floor(dt.getTime() / 1000);
-  }
-  const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action: "set_expiry", expires_at: exp }) });
-  if (!data.ok) alert("失败：" + (data.reason || ""));
-  loadDevices();
-}
-window.editExpiry = editExpiry;
-
+function esc(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
 async function editNote(machine) {
   const cur = devNoteMap[machine] || "";
-  const v = prompt(`客户名备注：`, cur);
+  const v = prompt(`客户名备注（当前：${cur || "未填"}）——发码时忘了填、填错了，都能在这里改：`, cur);
   if (v === null) return;
   const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ machineCode: machine, action: "set_note", note: v.trim() }) });
   if (!data.ok) alert("失败：" + (data.reason || ""));
@@ -569,34 +416,44 @@ async function editNote(machine) {
 window.editNote = editNote;
 
 function renderIssued(list) {
-  if (!list.length) { $("issuedBody").innerHTML = '<tr><td colspan="6" class="muted">还没有发出过码</td></tr>'; return; }
+  if (!list.length) {
+    $("issuedBody").innerHTML = '<tr><td colspan="6" class="muted">还没有发出过码</td></tr>';
+    return;
+  }
   $("issuedBody").innerHTML = list.map((i) => `<tr>
-    <td class="mono">${i.machine || "—"}<div class="muted">${i.note || ""}</div>${i.attest_fail ? `<div style="color:#c62828">激活被拒：${i.attest_fail.reason}</div>` : ""}</td>
+    <td class="mono">${i.machine || "—"}<div class="muted">${i.note || ""}</div>${i.attest_fail ? `<div style="color:#c62828">激活被拒：${i.attest_fail.reason} · ${fmt(i.attest_fail.at)}</div>` : ""}</td>
     <td data-label="天数">${i.duration_text || (i.days === 0 ? "永久" : i.days + " 天")}</td>
     <td data-label="渠道">${i.channel === "dist" ? "分销" + (i.dist ? "(" + i.dist + ")" : "") : "直营"}</td>
     <td data-label="发出时间">${fmt(i.created_at)}</td>
-    <td data-label="状态">${i.status === "open" ? "待领取" : "未激活"}</td>
+    <td data-label="状态">${i.status === "open" ? "已开通·待领取" : "未激活"}</td>
     <td class="acts">${i.code ? `<button class="small ghost" onclick="copyIssued('${i.code}')">复制码</button> ` : ""}<button class="small danger" onclick="revokeCode('${i.licKey}')">作废</button></td></tr>`).join("");
 }
 async function revokeCode(licKey) {
-  if (!confirm("确定作废此码？")) return;
+  if (!confirm("作废这个码？作废后客户就用不了了。")) return;
   const { data } = await api("/api/admin/action", { method: "POST", body: JSON.stringify({ licKey, action: "revoke" }) });
-  if (!data.ok) alert("失败");
+  if (!data.ok) alert("失败：" + (data.reason || ""));
   loadDevices();
 }
 window.revokeCode = revokeCode;
-async function copyIssued(code) { try { await navigator.clipboard.writeText(code); alert("已复制"); } catch { prompt("复制：", code); } }
+async function copyIssued(code) {
+  try { await navigator.clipboard.writeText(code); alert("已复制：" + code); }
+  catch { prompt("复制这个码：", code); }
+}
 window.copyIssued = copyIssued;
 
 async function loadDevices() {
   const { status, data } = await api("/api/admin/devices");
-  if (!data.ok) return;
+  if (!data.ok) {
+    const why = `HTTP ${status}${data.reason ? "：" + data.reason : ""}${data.detail ? "：" + data.detail : ""}`;
+    $("tbody").innerHTML = `<tr><td colspan="8">未登录或加载失败（${why}）</td></tr>`;
+    $("issuedBody").innerHTML = `<tr><td colspan="6" class="muted">加载失败（${why}）</td></tr>`;
+    return;
+  }
   const pb = $("pendingBox");
   if (data.pending_open && data.pending_open.length) {
     pb.classList.remove("hidden");
-    pb.innerHTML = "待领取开通：" + data.pending_open.join(", ");
+    pb.innerHTML = "待领取开通（用户还没在客户端点「直接开通」领取）：<span class='mono'>" + data.pending_open.join("</span>, <span class='mono'>") + "</span>";
   } else pb.classList.add("hidden");
-  
   renderIssued(data.issued || []);
   applyFilter("qIssued", "issuedBody");
   if (!data.devices.length) {
@@ -624,7 +481,7 @@ async function loadDevices() {
           ? `<button class="small ghost" onclick="act('${d.machine}','restore')">恢复</button>`
           : `<button class="small danger" onclick="act('${d.machine}','revoke')">停用</button>`}
         <button class="small ghost" onclick="act('${d.machine}','unbind')">解绑</button>
-        <button class="small ghost" onclick="editExpiry('${d.machine}', ${lic.expires_at || 0})">改期</button>
+        <button class="small ghost" onclick="editExpiry('${d.machine}', ${lic.expires_at || 0})">修改时间</button>
         <button class="small ghost" onclick="editNote('${d.machine}')">备注</button>
         <button class="small danger" onclick="act('${d.machine}','delete')">删除</button>
       </td></tr>`;
@@ -633,8 +490,6 @@ async function loadDevices() {
 }
 $("refreshBtn").onclick = loadDevices;
 
-
-// --- 2. 分销商逻辑 ---
 async function loadDists() {
   const { data } = await api("/api/admin/dist");
   if (!data.ok) { $("distBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
@@ -643,7 +498,7 @@ async function loadDists() {
     const curParent = dp.value;
     dp.innerHTML = '<option value="">上级：总后台直属（第1级）</option>' + data.distributors
       .filter((x) => (x.level || 1) < 5)
-      .map((x) => `<option value="${x.slug}">上级：${x.name || x.slug}（${x.slug}）</option>`).join("");
+      .map((x) => `<option value="${x.slug}">上级：${x.name || x.slug}（${x.slug} · 第${x.level || 1}级 · 下级 ${x.children || 0}/3）</option>`).join("");
     dp.value = [...dp.options].some((o) => o.value === curParent) ? curParent : "";
   }
   if (!data.distributors.length) {
@@ -652,31 +507,52 @@ async function loadDists() {
   }
   $("distBody").innerHTML = data.distributors.map((d) => `<tr>
     <td class="mono" data-label="登录地址">${location.origin}/${d.slug}</td>
-    <td data-label="额度">${d.used} / ${d.quota < 0 ? "不限" : d.quota}<div class="muted">客户 ${d.users ? d.users.devices : 0} 台</div></td>
+    <td data-label="额度">${d.used} / ${d.quota < 0 ? "不限" : d.quota}<div class="muted">客户 ${d.users ? d.users.devices : 0} 台${d.users && d.users.pending ? "（待激活 " + d.users.pending + "）" : ""} · 游客 ${d.users ? d.users.guests : 0} 个</div></td>
     <td data-label="状态">${!d.has_pw ? "待他设密码" : (d.status === "active" ? "正常" : "已停用")}</td>
     <td class="acts">${d.status === "active"
       ? `<button class="small danger" onclick="distAct('${d.slug}','disable')">停用</button>`
       : `<button class="small ghost" onclick="distAct('${d.slug}','enable')">恢复</button>
-         <button class="small danger" onclick="distAct('${d.slug}','delete')">删除</button>`}
+         <button class="small danger" onclick="distAct('${d.slug}','delete')">删除账户</button>`}
       <button class="small ghost" onclick="distAct('${d.slug}','resetpw')">重置密码</button>
-      <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button></td>
-    <td class="mono" data-label="标识 / 名称">${d.slug}<div class="muted">${d.name || ""}</div></td></tr>`).join("");
+      <button class="small ghost" onclick="distAct('${d.slug}','rename')">改名</button>
+      <button class="small ghost" onclick="distAct('${d.slug}','reslug')">标识</button>
+      <button class="small ghost" onclick="distAct('${d.slug}','quota')">改额度</button>
+      <button class="small ghost" onclick="location.href='/tree.html?slug=${d.slug}'">看名下</button></td>
+    <td class="mono" data-label="标识 / 名称">${d.slug}<div class="muted">${d.name || ""}</div><div class="muted">第${d.level || 1}级${d.parent ? " · 上级 " + d.parent : " · 总后台直开"} · 下级 ${d.children || 0}/3</div></td></tr>`).join("");
   applyFilter("qDists", "distBody");
 }
 async function distAct(slug, action) {
   const body = { slug, action };
-  if (action === "resetpw" && !confirm(`重置密码？`)) return;
-  if (action === "delete" && !confirm(`彻底删除分销商 ${slug}？`)) return;
+  if (action === "resetpw" && !confirm(`重置 ${slug} 的密码？他下次打开链接时要重新设置密码。`)) return;
+  if (action === "delete" && !confirm(`彻底删除分销商 ${slug}？删除后他的链接立即失效、不可恢复（他已发出的客户不受影响）。`)) return;
   if (action === "quota") {
     const q = prompt(`分销商 ${slug} 的总额度（个数，-1 = 不限）：`);
     if (q === null || q === "") return;
     body.quota = Number(q);
   }
+  if (action === "rename") {
+    const n = prompt(`分销商 ${slug} 的新名称（用户名）：`);
+    if (n === null || !n.trim()) return;
+    body.name = n.trim();
+  }
+  if (action === "reslug") {
+    const n = prompt(`把 ${slug} 的登录标识改成（小写字母/数字/-/_，2–24 位）：\n改完他的登录地址变成 ${location.origin}/新标识，旧地址立即失效；密码、额度、客户都不变。`);
+    if (n === null || !n.trim()) return;
+    body.new_slug = n.trim().toLowerCase();
+  }
   const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify(body) });
-  if (!data.ok) alert("失败");
+  if (!data.ok) alert("失败：" + (data.reason === "exists" ? "这个标识已被占用" : data.reason === "bad_slug" ? "标识格式不对" : data.reason || ""));
   loadDists();
 }
 window.distAct = distAct;
+
+async function loadStock() {
+  const { data } = await api("/api/admin/stock");
+  if (!data.ok) { $("stockAll").textContent = "加载失败"; return; }
+  $("stockAll").innerHTML = data.stock.length
+    ? data.stock.slice(0, 30).map((x) => `<div>${fmt(x.at)} · ${x.from === "admin" ? "总控制台" : "分销商 " + x.from} 给 <b>${x.dist}</b> 补了 <b>+${x.delta}</b> 个额度</div>`).join("")
+    : "还没有进货记录";
+}
 
 $("distCreateBtn").onclick = async () => {
   const body = {
@@ -687,21 +563,14 @@ $("distCreateBtn").onclick = async () => {
     quota: Number($("dquota").value || 100),
     parent: $("dparent").value || undefined,
   };
-  if (!body.slug) { $("distMsg").textContent = "标识必填"; return; }
+  if (!body.slug) { $("distMsg").textContent = "标识必填（密码可留空，他首次打开自己设）"; return; }
   const { data } = await api("/api/admin/dist", { method: "POST", body: JSON.stringify(body) });
-  $("distMsg").textContent = data.ok ? "添加成功" : "失败：" + data.reason;
+  $("distMsg").textContent = data.ok
+    ? `已添加：他的登录地址 ${location.origin}/${body.slug}`
+    : "失败：" + (data.reason === "children_limit" ? "这个上级名下已有 3 个下级，满了" : data.reason === "max_level" ? "上级已是第 5 级，不能再往下加" : data.reason === "parent_not_found" ? "上级分销商不存在" : data.reason === "exists" ? "这个标识已被占用" : data.reason || "");
   if (data.ok) loadDists();
 };
 
-async function loadStock() {
-  const { data } = await api("/api/admin/stock");
-  if (!data.ok) { $("stockAll").textContent = "加载失败"; return; }
-  $("stockAll").innerHTML = data.stock.length
-    ? data.stock.slice(0, 30).map((x) => `<div>${fmt(x.at)} · ${x.from === "admin" ? "总后台" : "分销商 " + x.from} 给 <b>${x.dist}</b> 补了 <b>+${x.delta}</b> 个额度</div>`).join("")
-    : "还没有进货记录";
-}
-
-// --- 3. 游客逻辑 ---
 async function loadGuests() {
   const { data } = await api("/api/admin/guest");
   if (!data.ok) { $("guestBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
@@ -715,68 +584,91 @@ async function loadGuests() {
     guestLimitMap[g.id] = g.fetch ? g.fetch.daily_limit : 10;
     guestNameMap[g.id] = g.username || "";
     return `<tr>
-    <td>${g.username}<div class="muted">${g.note || ""}${g.channel === "dist" ? " · 分销" : ""}</div></td>
+    <td>${g.username}<div class="muted">${g.note || ""}${g.channel === "dist" ? " · 分销" : ""}${g.dist ? "(" + g.dist + ")" : ""}</div></td>
     <td class="mono" data-label="专属页面">${page} <button class="small ghost" onclick="copyGuestPage('${page}')">复制</button></td>
-    <td data-label="到期">${g.expires_at ? fmt(g.expires_at) : "永久"}</td>
-    <td data-label="状态">${st}<div class="muted">今日拉取 ${g.fetch ? g.fetch.fetch_day_count : 0}/${g.fetch && g.fetch.daily_limit === 0 ? "不限" : (g.fetch ? g.fetch.daily_limit : 10)} 次</div></td>
+    <td data-label="到期">${g.expires_at ? fmt(g.expires_at) : "永久"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
+    <td data-label="状态">${st}${g.fetch && g.fetch.auto_disabled ? `<div style="color:#c0392b">自动停用：近7天出现在 ${g.fetch.auto_disabled.regions.length} 个省份<div class="muted">${g.fetch.auto_disabled.regions.join("、")}</div></div>` : ""}<div class="muted">拉取 ${g.fetch ? g.fetch.fetch_count : 0} 次 · 今日 ${g.fetch ? g.fetch.fetch_day_count : 0}/${g.fetch && g.fetch.daily_limit === 0 ? "不限" : (g.fetch ? g.fetch.daily_limit : 10)} 次${g.fetch && g.fetch.fetch_count ? ` · 最近 ${g.fetch.last_region || "?"} ${g.fetch.last_fetch_at ? fmt(g.fetch.last_fetch_at) : ""} · 近7天 ${g.fetch.regions_7d.length} 省` : ""}${g.fetch && g.fetch.daily_limit > 0 && g.fetch.fetch_day_count >= g.fetch.daily_limit ? ` · <span style="color:#c0392b">今日超限已停，明日自动恢复</span>` : ""}</div></td>
     <td class="acts">${g.status === "disabled"
       ? `<button class="small ghost" onclick="guestAct('${g.id}','enable')">恢复</button>
          <button class="small danger" onclick="guestAct('${g.id}','delete')">删除</button>`
       : `<button class="small danger" onclick="guestAct('${g.id}','disable')">停用</button>`}
-      <button class="small ghost" onclick="editGuestExpiry('${g.id}', ${g.expires_at || 0})">改期</button>
+      <button class="small ghost" onclick="editGuestExpiry('${g.id}', ${g.expires_at || 0})">修改时间</button>
       <button class="small ghost" onclick="guestLimit('${g.id}')">拉取上限</button>
+      <button class="small ghost" onclick="guestAct('${g.id}','rename')">改名</button>
       <button class="small ghost" onclick="guestAct('${g.id}','password')">改密码</button></td></tr>`;
   }).join("");
   applyFilter("qGuests", "guestBody");
 }
-async function copyGuestPage(page) { try { await navigator.clipboard.writeText(page); alert("已复制"); } catch { prompt("复制：", page); } }
+async function copyGuestPage(page) {
+  try { await navigator.clipboard.writeText(page); alert("已复制专属页面链接：" + page); }
+  catch { prompt("复制这个链接发给客户：", page); }
+}
 window.copyGuestPage = copyGuestPage;
-
+const guestLimitMap = {};
+const guestNameMap = {};
 async function guestLimit(id) {
   const cur = guestLimitMap[id];
-  const v = prompt(`每日拉取上限（0 = 不限），留空 = 默认10`, cur === 0 ? "0" : String(cur ?? 10));
+  const v = prompt(`每日拉取上限（当前：${cur === 0 ? "不限" : (cur ?? 10) + " 次"}）\n填次数（0 = 不限），留空 = 恢复默认 10 次`, cur === 0 ? "0" : String(cur ?? 10));
   if (v === null) return;
   const t = v.trim();
   const body = { id, action: "set_limit", daily_limit: t === "" ? null : Number(t) };
+  if (t !== "" && (!Number.isInteger(body.daily_limit) || body.daily_limit < 0 || body.daily_limit > 999)) { alert("填 0 到 999 的整数"); return; }
   const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify(body) });
-  if (!data.ok) alert("失败");
+  if (!data.ok) alert("失败：" + (data.reason || ""));
   loadGuests();
 }
 window.guestLimit = guestLimit;
 
 async function guestAct(id, action) {
   const body = { id, action };
-  if (action === "delete" && !confirm("彻底删除？")) return;
+  if (action === "delete" && !confirm("彻底删除这个游客客户？他的专属页面和订阅链接立即失效、不可恢复。")) return;
+  if (action === "extend") {
+    const d = prompt("延期天数（可负数）：", "30");
+    if (d === null || d === "") return;
+    body.days = Number(d);
+  }
+  if (action === "rename") {
+    const n = prompt("新的用户名（客户名）：", guestNameMap[id] || "");
+    if (n === null || !n.trim()) return;
+    body.username = n.trim();
+  }
   if (action === "password") {
-    const p = prompt("新密码：");
+    const p = prompt("给他设置新密码（至少 6 位）：");
     if (p === null || p === "") return;
     body.password = p;
   }
   const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify(body) });
-  if (!data.ok) alert("失败");
+  if (!data.ok) alert("失败：" + (data.reason === "disable_first" ? "先停用才能删除" : data.reason || ""));
   loadGuests();
 }
 window.guestAct = guestAct;
 
+// Guest expiry, hand-edited to the second: type the exact moment
+// (date + time, down to seconds), or 0 / 永久 for permanent. A past
+// moment expires the guest at once.
 function localTimeTextSec(ts) {
   const d = new Date(ts * 1000);
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
 }
 async function editGuestExpiry(id, expiresAt) {
-  const v = prompt(`修改到期时间：\n按格式填：2026-11-04 01:17:44\n填 0 = 永久`, expiresAt ? localTimeTextSec(expiresAt) : "");
+  const v = prompt(
+    `修改到期时间（当前：${expiresAt ? fmt(expiresAt) : "永久"}）\n按这个格式填，精确到秒：2026-11-04 01:17:44\n填 0 或“永久” = 改成永久`,
+    expiresAt ? localTimeTextSec(expiresAt) : "");
   if (v === null || v.trim() === "") return;
+  const t = v.trim();
   let exp = null;
-  if (v.trim() !== "0" && v.trim() !== "永久") {
-    const dt = new Date(v.trim().replace(/-/g, '/'));
-    if (isNaN(dt.getTime())) return;
+  if (!(t === "0" || t === "永久" || t.toLowerCase() === "permanent")) {
+    const m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) { alert("格式不对，按 2026-11-04 01:17:44 这样填"); return; }
+    const dt = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+    if (isNaN(dt.getTime())) { alert("这个时间不对，检查一下"); return; }
     exp = Math.floor(dt.getTime() / 1000);
   }
   const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify({ id, action: "set_expiry", expires_at: exp }) });
-  if (!data.ok) alert("失败");
+  if (!data.ok) alert("失败：" + (data.reason || ""));
   loadGuests();
 }
 window.editGuestExpiry = editGuestExpiry;
-
 $("guestCreateBtn").onclick = async () => {
   const body = {
     action: "create",
@@ -786,151 +678,37 @@ $("guestCreateBtn").onclick = async () => {
     note: $("gnote").value.trim(),
     daily_limit: $("glimit").value === "" ? undefined : Number($("glimit").value),
   };
+  if (!body.username) { $("guestMsg").textContent = "用户名必填"; return; }
+  if (!body.password) { $("guestMsg").textContent = "密码必填（至少 6 位）"; return; }
   const { data } = await api("/api/admin/guest", { method: "POST", body: JSON.stringify(body) });
-  $("guestMsg").textContent = data.ok ? "添加成功" : "失败：" + data.reason;
+  $("guestMsg").textContent = data.ok
+    ? `已添加：把 ${location.origin}${data.path} 发给客户`
+    : "失败：" + (data.reason === "exists" ? "用户名已存在" : data.reason || "");
   if (data.ok) loadGuests();
 };
-
-
-// --- 前端展示类 JS ---
+</script>
+<script>
 (() => {
-  // 1. 生成假 IP 显得真实
-  const fakeIpEl = document.getElementById('fakeIp');
-  if(fakeIpEl) {
-    fakeIpEl.innerText = Math.floor(Math.random()*150+50) + '.' + Math.floor(Math.random()*255) + '.***.***';
-  }
-
-  // 2. 世界时钟渲染
-  const worldCities = [
-    { id: "bj", name: "北京 / 亚洲", tz: "Asia/Shanghai" },
-    { id: "ty", name: "东京 / 亚洲", tz: "Asia/Tokyo" },
-    { id: "ld", name: "伦敦 / 欧洲", tz: "Europe/London" },
-    { id: "ny", name: "纽约 / 美洲", tz: "America/New_York" },
-    { id: "la", name: "洛杉矶 / 美洲", tz: "America/Los_Angeles" },
-    { id: "sy", name: "悉尼 / 澳洲", tz: "Australia/Sydney" }
-  ];
-
-  const wcGrid = document.getElementById("worldClocksGrid");
-  if (wcGrid) {
-    wcGrid.innerHTML = worldCities.map(c => `
-      <div class="w-clock-card">
-        <div class="w-city">${c.name}</div>
-        <div id="wt-${c.id}" class="w-time">--:--:--</div>
-        <div id="wd-${c.id}" class="w-date">--月--日</div>
-      </div>
-    `).join("");
-  }
-
-  // 3. 金融市场渲染及状态判断
-  const markets = [
-    { name: "纽约证券交易所 (NYSE)", tz: "America/New_York", openHr: 9.5, closeHr: 16 },
-    { name: "伦敦证券交易所 (LSE)", tz: "Europe/London", openHr: 8, closeHr: 16.5 },
-    { name: "东京证券交易所 (TSE)", tz: "Asia/Tokyo", openHr: 9, closeHr: 15 },
-    { name: "上海证券交易所 (SSE)", tz: "Asia/Shanghai", openHr: 9.5, closeHr: 15 }
-  ];
-  
-  const renderMarkets = () => {
-    const ml = document.getElementById("marketList");
-    if (!ml) return;
-    
-    let html = "";
-    const now = new Date();
-    
-    markets.forEach(m => {
-      const options = { timeZone: m.tz, hour: 'numeric', minute: 'numeric', hour12: false, weekday: 'short' };
-      const formatter = new Intl.DateTimeFormat('en-US', options);
-      const parts = formatter.formatToParts(now);
-      
-      let hour = 0, min = 0, isWeekend = false;
-      parts.forEach(p => {
-        if (p.type === 'hour') hour = parseInt(p.value);
-        if (p.type === 'minute') min = parseInt(p.value);
-        if (p.type === 'weekday' && (p.value === 'Sat' || p.value === 'Sun')) isWeekend = true;
-      });
-      
-      const currentDecimalHour = hour + (min / 60);
-      let isOpen = false;
-      if (!isWeekend && currentDecimalHour >= m.openHr && currentDecimalHour < m.closeHr) {
-        isOpen = true;
-      }
-      
-      html += `
-        <div class="market-item">
-          <span>${m.name}</span>
-          <div class="market-status">
-            <div class="dot ${isOpen ? 'open' : 'closed'}"></div>
-            <span style="color: ${isOpen ? 'var(--green)' : '#a0aec0'}">${isOpen ? '交易中' : '已休市'}</span>
-          </div>
-        </div>
-      `;
-    });
-    ml.innerHTML = html;
-  };
-  renderMarkets();
-
-  // 4. 时间与时间戳循环更新
   const t = document.getElementById("clockTime"), d = document.getElementById("clockDate");
   const wk = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-  
+  const p2 = (n) => String(n).padStart(2, "0");
   const tick = () => {
     const now = new Date();
-    if (t) t.textContent = pad2(now.getHours()) + ":" + pad2(now.getMinutes()) + ":" + pad2(now.getSeconds());
-    if (d) d.textContent = now.getFullYear() + "-" + pad2(now.getMonth() + 1) + "-" + pad2(now.getDate()) + " " + wk[now.getDay()];
-
-    if (!document.getElementById("homeView").classList.contains("hidden")) {
-      // 传统世界时钟
-      worldCities.forEach(c => {
-        const timeEl = document.getElementById(`wt-${c.id}`);
-        const dateEl = document.getElementById(`wd-${c.id}`);
-        if(timeEl) timeEl.textContent = now.toLocaleString("zh-CN", { timeZone: c.tz, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        if(dateEl) dateEl.textContent = now.toLocaleString("zh-CN", { timeZone: c.tz, month: 'short', day: 'numeric', weekday: 'short' });
-      });
-      
-      // 更新 Unix 时间戳 (秒与毫秒)
-      const uDisp = document.getElementById("unixTimeDisplay");
-      if(uDisp) uDisp.textContent = Math.floor(now.getTime() / 1000);
-      const uMs = document.getElementById("unixTimeMs");
-      if(uMs) uMs.textContent = now.getTime();
-      const isoT = document.getElementById("isoTime");
-      if(isoT) isoT.textContent = now.toISOString();
-    }
+    if (t) t.textContent = p2(now.getHours()) + ":" + p2(now.getMinutes()) + ":" + p2(now.getSeconds());
+    if (d) d.textContent = now.getFullYear() + "-" + p2(now.getMonth() + 1) + "-" + p2(now.getDate()) + " " + wk[now.getDay()];
   };
   tick(); setInterval(tick, 1000);
 })();
-
-// --- 独立功能：计时器 ---
-let timerInterval = null;
-function startTimer(minutes) {
-  clearInterval(timerInterval);
-  let totalSeconds = minutes * 60;
-  const display = document.getElementById("timerDisplay");
-  
-  const updateDisplay = () => {
-    let m = Math.floor(totalSeconds / 60);
-    let s = totalSeconds % 60;
-    display.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
-    display.style.color = totalSeconds < 60 ? "var(--red)" : "var(--ink)";
-    
-    if (totalSeconds <= 0) {
-      clearInterval(timerInterval);
-      display.textContent = "时间到！";
-    } else {
-      totalSeconds--;
-    }
-  };
-  
-  updateDisplay();
-  timerInterval = setInterval(updateDisplay, 1000);
-}
-
-function stopTimer() {
-  clearInterval(timerInterval);
-  const display = document.getElementById("timerDisplay");
-  display.textContent = "00:00";
-  display.style.color = "var(--ink)";
-}
-window.startTimer = startTimer;
-window.stopTimer = stopTimer;
+document.getElementById("avatarBtn").addEventListener("click", () => {
+  const lb = document.getElementById("loginBox");
+  if (lb && !lb.classList.contains("hidden")) {
+    lb.scrollIntoView({ behavior: "smooth", block: "center" });
+    const pw = document.getElementById("pw");
+    if (pw) setTimeout(() => pw.focus(), 350);
+  } else {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+});
 </script>
 </body>
 </html>
