@@ -17,11 +17,24 @@ function usableUrl(v) {
   }
 }
 function channelCfg(env, channel) {
+  if (channel === "guest") {
+    const g = usableUrl(env.SUB_URL_GUEST);
+    if (g) return { url: g, prefix: "subg" };
+  }
   if (channel === "dist") {
     const dist = usableUrl(env.SUB_URL_DIST);
     if (dist) return { url: dist, prefix: "subd" };
   }
   return { url: usableUrl(env.SUB_URL), prefix: "sub" };
+}
+
+// Guests normally ride their record's channel (main/dist). Setting
+// env.SUB_URL_GUEST pins EVERY guest to that one subscription address
+// instead — unset, or not a valid http(s) URL, guest dispatch follows
+// the record's channel exactly as before.
+export function guestChannel(env, rec) {
+  if (usableUrl(env.SUB_URL_GUEST)) return "guest";
+  return rec && rec.channel === "dist" ? "dist" : "main";
 }
 
 export async function serveSubscription(env, channel) {

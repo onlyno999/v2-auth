@@ -1,5 +1,5 @@
 import { getGuest, guestProblem, vaultOpen, logEvent, noteGuestFetch, beijingDay, nowSec } from "../lib/core.js";
-import { serveSubscription } from "../api/subscription.js";
+import { serveSubscription, guestChannel } from "../api/subscription.js";
 
 // ---------- poisoned subscription for expired guests ----------
 // Every server address in the subscription becomes one dead IP:
@@ -92,7 +92,7 @@ export async function onRequestGet({ request, env, params }) {
     // Served on the fly from the live record — renew the guest and
     // the real content is back on the very next fetch. If the real
     // subscription cannot be fetched, fall back to the hard cut.
-    const content = await serveSubscription(env, rec.channel === "dist" ? "dist" : "main");
+    const content = await serveSubscription(env, guestChannel(env, rec));
     if (content) {
       await logEvent(env, "guest_sub_poison", rec.username || "", "expired");
       return new Response(poisonSubscription(content), {
@@ -126,7 +126,7 @@ export async function onRequestGet({ request, env, params }) {
   if (verdict.dailyBlocked) return deny("daily_limit", 429);
   if (verdict.disabled) return deny("disabled");
 
-  const content = await serveSubscription(env, rec.channel === "dist" ? "dist" : "main");
+  const content = await serveSubscription(env, guestChannel(env, rec));
   if (!content) return deny("sub_unavailable", 502);
   return new Response(content, {
     status: 200,
