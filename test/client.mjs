@@ -183,6 +183,27 @@ const setPerm = await j("/api/admin/action", { machineCode: M1, action: "set_exp
 const valPerm = await signedCall("/api/validate", M1, dev1.kp);
 check("set_expiry null makes permanent", setPerm.status === 200 && setPerm.data.expires_at === null && valPerm.status === 200);
 
+// device subscription poison (owner, 2026-11-06): mirrors the guest
+// two-stage expiry — on the Beijing expiry day an expired device
+// pulling its subscription gets the poisoned file (every address
+// the dead IP); from the next day on the pull is a hard 403.
+await j("/api/admin/action", { machineCode: M1, action: "set_expiry", expires_at: nowS - 120 }, { cookie });
+const subPoison = await signedCall("/api/subscription", M1, dev1.kp);
+let devPoisonText = "";
+try {
+  devPoisonText = Buffer.from(subPoison.text.replace(/\s+/g, ""), "base64").toString("utf8");
+} catch { /* not base64: the checks below fail loudly */ }
+const devStrayIps = (devPoisonText.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []).filter((x) => x !== "114.115.116.117");
+check("device expired today gets poisoned subscription (200, every address the dead IP)",
+  subPoison.status === 200 && devPoisonText.includes("114.115.116.117") && devStrayIps.length === 0,
+  `stray=${devStrayIps.length}`);
+await j("/api/admin/action", { machineCode: M1, action: "set_expiry", expires_at: nowS - 90000 }, { cookie });
+const subPastDay = await signedCall("/api/subscription", M1, dev1.kp);
+check("device expired before today: subscription pull hard-denied", subPastDay.status === 403);
+await j("/api/admin/action", { machineCode: M1, action: "set_expiry", expires_at: null }, { cookie });
+const subAlive = await signedCall("/api/subscription", M1, dev1.kp);
+check("device permanent again: real subscription served", subAlive.status === 200 && subAlive.text.length > 500);
+
 const devList = await fetch(BASE + "/api/admin/devices", { headers: { cookie } }).then((r) => r.json());
 check("device table lists devices", devList.ok && devList.devices.length >= 2, `${devList.devices?.length} devices`);
 const noAuthList = await fetch(BASE + "/api/admin/devices").then((r) => r.status);
