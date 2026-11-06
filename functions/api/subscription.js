@@ -1,5 +1,4 @@
-import { readJson, nowSec, gate, putDev, logEvent, beijingDay } from "../lib/core.js";
-import { poisonSubscription } from "../lib/poison.js";
+import { readJson, nowSec, gate, putDev, logEvent } from "../lib/core.js";
 
 // Channel config: each license carries channel "main" | "dist".
 // main -> env.SUB_URL (KV sub:*), dist -> env.SUB_URL_DIST (KV subd:*).
@@ -69,27 +68,16 @@ export async function onRequestPost({ request, env }) {
   const body = await readJson(request);
   const g = await gate(env, body.machineCode, body, "/api/subscription");
   if (!g.ok) {
-    // Two-stage expiry for devices too, same as guest links
-    // (owner, 2026-11-06): ON the Beijing expiry day an expired
-    // device that pulls still gets a subscription — the poisoned
-    // one, every server address a dead IP — so a client that keeps
-    // auto-pulling, or whose core is started without the app ever
-    // being opened, overwrites its real nodes with junk. From the
-    // next day on, the hard deny below stands. If the real
-    // subscription cannot be fetched, fall back to the hard deny.
-    if (
-      g.reason === "expired" && g.lic && g.lic.expires_at &&
-      beijingDay(nowSec()) === beijingDay(g.lic.expires_at)
-    ) {
-      const ch = g.lic.channel === "dist" ? "dist" : "main";
-      const real = await serveSubscription(env, ch);
-      if (real) {
-        await logEvent(env, "sub_poison", body.machineCode || "", "expired");
-        return new Response(poisonSubscription(real), {
-          status: 200,
-          headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
-        });
-      }
+    // Expired devices (owner, 2026-11-06, final form): stop serving
+    // real content and say so in the open — the pull returns a
+    // plain-text notice, on any day, no window. No fabricated or
+    // altered content is ever served as a subscription.
+    if (g.reason === "expired") {
+      await logEvent(env, "sub_expired_notice", body.machineCode || "", "expired");
+      return new Response("已到期，请联系卖家", {
+        status: 403,
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+      });
     }
     await logEvent(env, "sub_deny", body.machineCode || "", g.reason);
     return new Response(JSON.stringify({ ok: false, reason: g.reason }), {

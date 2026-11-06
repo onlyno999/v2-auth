@@ -183,23 +183,18 @@ const setPerm = await j("/api/admin/action", { machineCode: M1, action: "set_exp
 const valPerm = await signedCall("/api/validate", M1, dev1.kp);
 check("set_expiry null makes permanent", setPerm.status === 200 && setPerm.data.expires_at === null && valPerm.status === 200);
 
-// device subscription poison (owner, 2026-11-06): mirrors the guest
-// two-stage expiry — on the Beijing expiry day an expired device
-// pulling its subscription gets the poisoned file (every address
-// the dead IP); from the next day on the pull is a hard 403.
+// device subscription expiry notice (owner, 2026-11-06): an expired
+// device pulling its subscription gets NO subscription content at
+// all — a plain-text notice instead, on any day, no window. Nothing
+// fabricated is ever served as subscription content.
 await j("/api/admin/action", { machineCode: M1, action: "set_expiry", expires_at: nowS - 120 }, { cookie });
-const subPoison = await signedCall("/api/subscription", M1, dev1.kp);
-let devPoisonText = "";
-try {
-  devPoisonText = Buffer.from(subPoison.text.replace(/\s+/g, ""), "base64").toString("utf8");
-} catch { /* not base64: the checks below fail loudly */ }
-const devStrayIps = (devPoisonText.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || []).filter((x) => x !== "114.115.116.117");
-check("device expired today gets poisoned subscription (200, every address the dead IP)",
-  subPoison.status === 200 && devPoisonText.includes("114.115.116.117") && devStrayIps.length === 0,
-  `stray=${devStrayIps.length}`);
+const subExp1 = await signedCall("/api/subscription", M1, dev1.kp);
+check("device expired: pull returns plain-text expiry notice (403)",
+  subExp1.status === 403 && subExp1.text.includes("已到期，请联系卖家"));
 await j("/api/admin/action", { machineCode: M1, action: "set_expiry", expires_at: nowS - 90000 }, { cookie });
-const subPastDay = await signedCall("/api/subscription", M1, dev1.kp);
-check("device expired before today: subscription pull hard-denied", subPastDay.status === 403);
+const subExp2 = await signedCall("/api/subscription", M1, dev1.kp);
+check("device expired long ago: same plain-text notice (no window)",
+  subExp2.status === 403 && subExp2.text.includes("已到期，请联系卖家"));
 await j("/api/admin/action", { machineCode: M1, action: "set_expiry", expires_at: null }, { cookie });
 const subAlive = await signedCall("/api/subscription", M1, dev1.kp);
 check("device permanent again: real subscription served", subAlive.status === 200 && subAlive.text.length > 500);
