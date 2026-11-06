@@ -6,10 +6,15 @@ import { serveSubscription, guestChannel } from "../api/subscription.js";
 // raw IPv4s anywhere in the text, the authority host of every
 // share URI (domains included — an IP-only pass would leave
 // domain-addressed nodes alive), and the "add" field inside
-// vmess payloads. Ports, credentials and names stay untouched so
-// the file stays structurally valid and clients accept the update.
+// vmess payloads. Every UUID is replaced too: a poisoned file that
+// kept the real UUID would leak it — anyone could pair it with a
+// live address by hand and keep connecting. Ports and names stay
+// untouched so the file stays structurally valid and clients
+// accept the update.
 const FAKE_IP = "114.115.116.117";
+const FAKE_UUID = "00000000-0000-4000-8000-000000000000";
 const IPV4_RE = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
+const UUID_RE = /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g;
 
 function b64DecodeText(s) {
   const bin = atob(s.replace(/\s+/g, ""));
@@ -41,14 +46,17 @@ export function poisonSubscription(content) {
       try {
         let inner = b64DecodeText(vm[1]);
         inner = inner.replace(/"add"\s*:\s*"[^"]*"/, `"add": "${FAKE_IP}"`);
+        inner = inner.replace(/"id"\s*:\s*"[^"]*"/, `"id": "${FAKE_UUID}"`);
+        inner = inner.replace(UUID_RE, FAKE_UUID);
         inner = inner.replace(IPV4_RE, FAKE_IP);
         return "vmess://" + b64EncodeText(inner);
       } catch {
-        return line.replace(IPV4_RE, FAKE_IP);
+        return line.replace(UUID_RE, FAKE_UUID).replace(IPV4_RE, FAKE_IP);
       }
     }
     return line
       .replace(/^([a-z0-9+.-]+:\/\/[^/@]*@)([^/:?#]+)/i, `$1${FAKE_IP}`)
+      .replace(UUID_RE, FAKE_UUID)
       .replace(IPV4_RE, FAKE_IP);
   });
   const out = lines.join("\n");
