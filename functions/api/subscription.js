@@ -51,7 +51,11 @@ export async function serveSubscription(env, channel) {
   try {
     const up = await fetch(url, {
       headers: { "user-agent": "okhttp/4.9.0" },
-      signal: AbortSignal.timeout(8000),
+      // 20s, not 8s: the main subscription source measured 2026-11-07
+      // answers in ~5s from a browser and slower through the worker —
+      // at 8s every member pull timed out into sub_unavailable while
+      // the address itself was perfectly healthy.
+      signal: AbortSignal.timeout(20000),
     });
     if (!up.ok) return null;
     const text = await up.text();
