@@ -22,7 +22,10 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>我的订阅</h1>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    <h1>我的订阅</h1>
+    <button id="logoutBtn" class="ghost hidden" type="button" style="padding:6px 12px;font-size:13px;margin-top:10px">退出登录</button>
+  </div>
 
   <div id="loginBox" class="card">
     <div class="muted">输入卖家给你的密码登录。</div>
@@ -84,6 +87,7 @@ async function loadMe() {
     $("linkText").textContent = data.link;
     $("loginBox").classList.add("hidden");
     $("panel").classList.remove("hidden");
+    $("logoutBtn").classList.remove("hidden");
     return true;
   }
   return false;
@@ -114,6 +118,11 @@ async function doLogin() {
 }
 $("loginBtn").onclick = doLogin;
 $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+$("logoutBtn").onclick = async () => {
+  try { await fetch("/api/guest/logout", { method: "POST" }); } catch {}
+  try { localStorage.removeItem("v2gsess"); } catch {}
+  location.reload();
+};
 $("copyBtn").onclick = async () => {
   const text = $("linkText").textContent;
   try { await navigator.clipboard.writeText(text); $("copyBtn").textContent = "已复制"; }

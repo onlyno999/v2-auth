@@ -337,6 +337,10 @@ check("guest me: remaining time + sealed link only, no real address",
   JSON.stringify(gMe).slice(0, 110));
 const gFetch = await fetch(gMe.link);
 check("guest link serves subscription content", gFetch.status === 200 && (await gFetch.text()) === expectedSub);
+check("guest page has logout button", gPageHtml.includes('id="logoutBtn"'));
+const gOut = await fetch(BASE + "/api/guest/logout", { method: "POST" });
+const gOutCookie = gOut.headers.get("set-cookie") || "";
+check("guest logout expires session cookie", gOut.status === 200 && gOutCookie.startsWith("gsess=;") && gOutCookie.includes("Max-Age=0"));
 check("tampered guest link rejected", (await fetch(BASE + "/s/AAAAbbbbCCCCdddd")).status === 404);
 await j("/api/admin/guest", { id: GID, action: "disable" }, { cookie });
 check("guest link dead after disable", (await fetch(gMe.link)).status === 403);
