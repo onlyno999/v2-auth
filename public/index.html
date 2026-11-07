@@ -218,6 +218,30 @@
         <tbody id="guestBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
       </table>
     </div>
+
+    <h2>小火箭正式会员（苹果手机等第三方客户端）</h2>
+    <div class="card">
+      <div class="row">
+        <input id="muser" placeholder="用户名（客户名）" style="width:150px">
+        <input id="mpw" placeholder="密码（至少 6 位）" style="width:170px">
+        <input id="mdurVal" type="number" min="1" value="365" style="width:80px">
+        <select id="mdurUnit">
+          <option value="minute">分钟</option>
+          <option value="hour">小时</option>
+          <option value="day" selected>天</option>
+          <option value="perm">永久</option>
+        </select>
+        <input id="mnote" placeholder="备注（可空）" style="width:140px">
+        <button id="memberCreateBtn">添加会员</button>
+        <span id="memberMsg" class="muted"></span>
+      </div>
+      <div class="muted" style="margin:8px 0">正式客户专用：派发的就是授权客户端同一个订阅地址。添加后把「专属页面」链接发给客户：他打开先输密码，进去看自己还剩多少天、复制他自己的订阅链接贴进小火箭，真实订阅地址不显示。停用 / 到期后他的订阅链接立刻失效；删除要先停用。</div>
+      <div class="row" style="margin-bottom:8px"><input id="qMembers" placeholder="搜索：用户名 / 备注" oninput="applyFilter('qMembers','memberBody')" style="flex:1"></div>
+      <table>
+        <thead><tr><th>用户名 / 备注</th><th>专属页面</th><th>到期</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="memberBody"><tr><td colspan="5" class="muted">加载中…</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -254,6 +278,7 @@ function enterConsole() {
   loadDists();
   loadStock();
   loadGuests();
+  loadMembers();
 }
 async function doLogin() {
   const days = Number($("loginDays").value) || 1;
@@ -713,6 +738,92 @@ $("guestCreateBtn").onclick = async () => {
     ? `已添加：把 ${location.origin}${data.path} 发给客户`
     : "失败：" + (data.reason === "exists" ? "用户名已存在" : data.reason || "");
   if (data.ok) loadGuests();
+};
+
+async function loadMembers() {
+  const { data } = await api("/api/admin/member");
+  if (!data.ok) { $("memberBody").innerHTML = '<tr><td colspan="5">加载失败</td></tr>'; return; }
+  if (!data.members.length) {
+    $("memberBody").innerHTML = '<tr><td colspan="5" class="muted">还没有正式会员</td></tr>';
+    return;
+  }
+  $("memberBody").innerHTML = data.members.map((g) => {
+    const page = `${location.origin}/m/${g.id}`;
+    const st = g.status === "disabled" ? "已停用" : (g.expired ? "已到期" : "正常");
+    memberNameMap[g.id] = g.username || "";
+    return `<tr>
+    <td>${g.username}<div class="muted">${g.note || ""}</div></td>
+    <td class="mono" data-label="专属页面">${page} <button class="small ghost" onclick="copyMemberPage('${page}')">复制</button></td>
+    <td data-label="到期">${g.expires_at ? fmt(g.expires_at) : "永久"}<div class="muted">时长 ${g.duration_text || ""}</div></td>
+    <td data-label="状态">${st}</td>
+    <td class="acts">${g.status === "disabled"
+      ? `<button class="small ghost" onclick="memberAct('${g.id}','enable')">恢复</button>
+         <button class="small danger" onclick="memberAct('${g.id}','delete')">删除</button>`
+      : `<button class="small danger" onclick="memberAct('${g.id}','disable')">停用</button>`}
+      <button class="small ghost" onclick="editMemberExpiry('${g.id}', ${g.expires_at || 0})">修改时间</button>
+      <button class="small ghost" onclick="memberAct('${g.id}','rename')">改名</button>
+      <button class="small ghost" onclick="memberAct('${g.id}','password')">改密码</button></td></tr>`;
+  }).join("");
+  applyFilter("qMembers", "memberBody");
+}
+async function copyMemberPage(page) {
+  try { await navigator.clipboard.writeText(page); alert("已复制专属页面链接：" + page); }
+  catch { prompt("复制这个链接发给客户：", page); }
+}
+window.copyMemberPage = copyMemberPage;
+const memberNameMap = {};
+async function memberAct(id, action) {
+  const body = { id, action };
+  if (action === "delete" && !confirm("彻底删除这个正式会员？他的专属页面和订阅链接立即失效、不可恢复。")) return;
+  if (action === "rename") {
+    const n = prompt("新的用户名（客户名）：", memberNameMap[id] || "");
+    if (n === null || !n.trim()) return;
+    body.username = n.trim();
+  }
+  if (action === "password") {
+    const p = prompt("给他设置新密码（至少 6 位）：");
+    if (p === null || p === "") return;
+    body.password = p;
+  }
+  const { data } = await api("/api/admin/member", { method: "POST", body: JSON.stringify(body) });
+  if (!data.ok) alert("失败：" + (data.reason === "disable_first" ? "先停用才能删除" : data.reason || ""));
+  loadMembers();
+}
+window.memberAct = memberAct;
+async function editMemberExpiry(id, expiresAt) {
+  const v = prompt(
+    `修改到期时间（当前：${expiresAt ? fmt(expiresAt) : "永久"}）\n按这个格式填，精确到秒：2026-11-04 01:17:44\n填 0 或“永久” = 改成永久`,
+    expiresAt ? localTimeTextSec(expiresAt) : "");
+  if (v === null || v.trim() === "") return;
+  const t = v.trim();
+  let exp = null;
+  if (!(t === "0" || t === "永久" || t.toLowerCase() === "permanent")) {
+    const m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) { alert("格式不对，按 2026-11-04 01:17:44 这样填"); return; }
+    const dt = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+    if (isNaN(dt.getTime())) { alert("这个时间不对，检查一下"); return; }
+    exp = Math.floor(dt.getTime() / 1000);
+  }
+  const { data } = await api("/api/admin/member", { method: "POST", body: JSON.stringify({ id, action: "set_expiry", expires_at: exp }) });
+  if (!data.ok) alert("失败：" + (data.reason || ""));
+  loadMembers();
+}
+window.editMemberExpiry = editMemberExpiry;
+$("memberCreateBtn").onclick = async () => {
+  const body = {
+    action: "create",
+    username: $("muser").value.trim(),
+    password: <redacted>
+    ...durFields("mdurVal", "mdurUnit"),
+    note: $("mnote").value.trim(),
+  };
+  if (!body.username) { $("memberMsg").textContent = "用户名必填"; return; }
+  if (!body.password) { $("memberMsg").textContent = "密码必填（至少 6 位）"; return; }
+  const { data } = await api("/api/admin/member", { method: "POST", body: JSON.stringify(body) });
+  $("memberMsg").textContent = data.ok
+    ? `已添加：把 ${location.origin}${data.path} 发给客户`
+    : "失败：" + (data.reason === "exists" ? "用户名已存在" : data.reason || "");
+  if (data.ok) loadMembers();
 };
 </script>
 <script>

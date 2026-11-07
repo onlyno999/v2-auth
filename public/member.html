@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的订阅</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; margin: 0; background: #f4f5f7; color: #1c2333; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 28px 16px 48px; }
+  h1 { font-size: 20px; margin: 8px 0 6px; }
+  .card { background: #fff; border-radius: 10px; padding: 18px 16px; box-shadow: 0 1px 3px rgba(20,30,60,.08); }
+  input { padding: 10px; border: 1px solid #ccd2dd; border-radius: 6px; font-size: 15px; width: 100%; box-sizing: border-box; }
+  button { padding: 10px 16px; border: 0; border-radius: 6px; background: #14181f; color: #fff; font-size: 15px; cursor: pointer; }
+  button.ghost { background: #e8ebf0; color: #1c2333; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .link { font-family: ui-monospace, Consolas, monospace; font-size: 13px; word-break: break-all; background: #fff8e6; border: 1px dashed #d9a441; padding: 10px 12px; border-radius: 8px; }
+  .big { font-size: 17px; font-weight: 600; }
+  .muted { color: #889; font-size: 13px; line-height: 1.7; }
+  #msg { margin: 10px 0; color: #b03a2e; min-height: 18px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+    <h1>我的订阅</h1>
+    <button id="logoutBtn" class="ghost hidden" type="button" style="padding:6px 12px;font-size:13px;margin-top:10px">退出登录</button>
+  </div>
+
+  <div id="loginBox" class="card">
+    <div class="muted">输入卖家给你的密码登录。</div>
+    <div style="margin-top:10px">
+      <input id="pw" type="password" placeholder="密码" autocomplete="current-password">
+    </div>
+    <div class="row">
+      <button id="loginBtn">登录</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <div id="panel" class="card hidden">
+    <div class="big" id="remainText"></div>
+    <div class="muted" id="expText"></div>
+    <div style="margin-top:14px" class="muted">我的专属订阅链接（粘贴到小火箭等软件的订阅里使用）：</div>
+    <div class="link" id="linkText" style="margin-top:6px"></div>
+    <div class="row">
+      <button id="copyBtn" class="ghost">复制链接</button>
+    </div>
+    <div class="muted" style="margin-top:10px">
+      使用方法（小火箭）：打开小火箭 → 右上角 + → 类型选 Subscribe（订阅）→ 把上面的链接粘贴到 URL 里 → 完成。以后节点更新，在小火箭里点订阅更新即可。<br>
+      这个链接只属于你一个人，别转发给别人；停用或到期后链接会自动失效。
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const gid = (location.pathname.match(/^\/m\/(.+)$/) || [])[1] || "";
+const REASONS = {
+  bad_password: "密码不对",
+  disabled: "账号已停用，请联系卖家",
+  expired: "已到期，请联系卖家续期",
+  not_found: "账号不存在，请确认打开的链接对不对",
+  rate_limited: "试得太多了，过一会儿再来",
+};
+const sess = () => { try { return localStorage.getItem("v2msess"); } catch { return null; } };
+
+async function loadMe() {
+  const s = sess();
+  const r = await fetch("/api/member/me", { headers: s ? { "x-msess": s } : {} });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 200 && data.ok) {
+    if (!data.expires_at) {
+      $("remainText").textContent = "永久有效";
+    } else if (data.remain_sec !== null && data.remain_sec !== undefined && data.remain_sec < 3600) {
+      $("remainText").textContent = `还剩 ${Math.max(1, data.minutes_left)} 分钟`;
+    } else if (data.remain_sec !== null && data.remain_sec !== undefined && data.remain_sec < 86400) {
+      const h = Math.floor(data.remain_sec / 3600);
+      const m = Math.ceil((data.remain_sec % 3600) / 60);
+      $("remainText").textContent = `还剩 ${h} 小时 ${m} 分钟`;
+    } else {
+      $("remainText").textContent = `还剩 ${data.days_left} 天`;
+    }
+    $("expText").textContent = data.expires_at
+      ? "到期时间：" + new Date(data.expires_at * 1000).toLocaleString("zh-CN", { hour12: false })
+      : "";
+    $("linkText").textContent = data.link;
+    $("loginBox").classList.add("hidden");
+    $("panel").classList.remove("hidden");
+    $("logoutBtn").classList.remove("hidden");
+    return true;
+  }
+  return false;
+}
+(async () => { if (sess()) await loadMe(); })();
+
+async function doLogin() {
+  $("msg").textContent = "";
+  if (!gid) { $("msg").textContent = REASONS.not_found; return; }
+  $("loginBtn").disabled = true;
+  try {
+    const r = await fetch("/api/member/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: gid, password: $("pw").value }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 200 && data.ok) {
+      if (data.session) { try { localStorage.setItem("v2msess", data.session); } catch {} }
+      if (!(await loadMe())) $("msg").textContent = "登录状态异常，请刷新重试";
+    } else {
+      $("msg").textContent = REASONS[data.reason] || ("失败：" + (data.reason || "未知错误"));
+    }
+  } catch (e) {
+    $("msg").textContent = "网络连接失败，请检查网络后重试";
+  }
+  $("loginBtn").disabled = false;
+}
+$("loginBtn").onclick = doLogin;
+$("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+$("logoutBtn").onclick = async () => {
+  try { await fetch("/api/member/logout", { method: "POST" }); } catch {}
+  try { localStorage.removeItem("v2msess"); } catch {}
+  location.reload();
+};
+$("copyBtn").onclick = async () => {
+  const text = $("linkText").textContent;
+  try { await navigator.clipboard.writeText(text); $("copyBtn").textContent = "已复制"; }
+  catch { prompt("复制这个链接：", text); }
+  setTimeout(() => { $("copyBtn").textContent = "复制链接"; }, 1600);
+};
+</script>
+</body>
+</html>

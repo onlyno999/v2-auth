@@ -1,4 +1,4 @@
-import { getGuest, guestProblem, vaultOpen, logEvent, noteGuestFetch, beijingDay, nowSec } from "../lib/core.js";
+import { getGuest, guestProblem, getMember, memberProblem, vaultOpen, logEvent, noteGuestFetch, beijingDay, nowSec } from "../lib/core.js";
 import { serveSubscription, guestChannel } from "../api/subscription.js";
 import { poisonSubscription } from "../lib/poison.js";
 
@@ -22,6 +22,32 @@ export async function onRequestGet({ request, env, params }) {
     payload = JSON.parse((await vaultOpen(env, params.token)) || "null");
   } catch {
     payload = null;
+  }
+  if (payload && payload.m) {
+    // Formal member （小火箭正式会员）: his link serves the main
+    // channel — the same subscription the authorized client pulls —
+    // while the record is usable. Expired answers the plain notice,
+    // exactly like an expired device; nothing else is ever served.
+    const mrec = await getMember(env, payload.m);
+    if (!mrec) return deny("not_found", 404);
+    const mproblem = memberProblem(mrec);
+    if (mproblem === "expired") {
+      await logEvent(env, "member_sub_expired", mrec.username || "", "expired");
+      return new Response("已到期，请联系卖家", {
+        status: 403,
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+      });
+    }
+    if (mproblem) {
+      await logEvent(env, "member_sub_deny", mrec.username || "", mproblem);
+      return deny(mproblem);
+    }
+    const mcontent = await serveSubscription(env, "main");
+    if (!mcontent) return deny("sub_unavailable", 502);
+    return new Response(mcontent, {
+      status: 200,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
   }
   if (!payload || !payload.g) return deny("bad_link", 404);
 

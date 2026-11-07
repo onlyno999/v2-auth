@@ -712,3 +712,48 @@ export async function guestIdFromRequest(env, request) {
     return null;
   }
 }
+
+// ---------- formal members （小火箭正式会员） ----------
+// A separate record kind that mirrors the guest mechanics (own page
+// at /m/<id>, password login, sealed personal /s/ link) for FORMAL
+// customers who cannot run the authorized client — iPhone users on
+// Shadowrocket and similar third-party clients. Differences from
+// guests: no fetch watching and no daily cap, the link always serves
+// the main channel (the very subscription the authorized client
+// pulls), and expiry answers the plain notice, like a device.
+export async function getMember(env, id) {
+  if (!id) return null;
+  const raw = await env.V2.get("mem:" + id);
+  return raw ? JSON.parse(raw) : null;
+}
+export async function putMember(env, id, rec) {
+  await bumpDataVersion(env);
+  await env.V2.put("mem:" + id, JSON.stringify(rec));
+}
+export function memberProblem(rec) {
+  return guestProblem(rec);
+}
+export async function memberSessionCookie(env, id) {
+  const payload = b64urlEncode(enc.encode(JSON.stringify({ exp: nowSec() + 60 * 60 * 24 * 30, mem: id })));
+  const mac = await hmac(env.SESSION_SECRET, payload);
+  return `${payload}.${mac}`;
+}
+export async function memberIdFromRequest(env, request) {
+  if (!env.SESSION_SECRET) return null;
+  const cookie = request.headers.get("cookie") || "";
+  const m = cookie.match(/msess=([^;]+)/);
+  const token = (m && m[1]) || request.headers.get("x-msess");
+  if (!token) return null;
+  const [payload, mac] = token.split(".");
+  if (!payload || !mac) return null;
+  if ((await hmac(env.SESSION_SECRET, payload)) !== mac) return null;
+  try {
+    const data = JSON.parse(new TextDecoder().decode(b64Decode(payload)));
+    if (!data.mem || data.exp <= nowSec()) return null;
+    const rec = await getMember(env, data.mem);
+    if (memberProblem(rec)) return null;
+    return data.mem;
+  } catch {
+    return null;
+  }
+}

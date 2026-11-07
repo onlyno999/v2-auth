@@ -29,6 +29,14 @@ export async function onRequest(context) {
         return env.ASSETS.fetch(new Request(url.toString(), { method: "GET" }));
       }
     }
+    const mm = url.pathname.match(/^\/m\/([^/.]+)$/);
+    if (mm && SLUG_RE.test(mm[1])) {
+      const exists = await env.V2.get("mem:" + mm[1]);
+      if (exists) {
+        url.pathname = "/member.html";
+        return env.ASSETS.fetch(new Request(url.toString(), { method: "GET" }));
+      }
+    }
     const m = url.pathname.match(/^\/([^/.]+)$/);
     if (m && SLUG_RE.test(m[1]) && !RESERVED_SLUGS.has(m[1])) {
       const exists = await env.V2.get("dist:" + m[1]);

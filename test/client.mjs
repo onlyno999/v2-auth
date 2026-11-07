@@ -380,6 +380,51 @@ await j("/api/admin/guest", { id: GID, action: "disable" }, { cookie });
 const gDel = await j("/api/admin/guest", { id: GID, action: "delete" }, { cookie });
 check("guest deleted, link + page gone", gDel.status === 200 && (await fetch(gMe.link)).status === 404 && (await fetch(BASE + "/g/" + GID)).status === 404);
 
+// ---- formal members （小火箭正式会员： /m/<id> page + main-channel link) ----
+const mbCreate = await j("/api/admin/member", { action: "create", username: "苹果正式会员", password: "member-pw-1", days: 30, note: "会员甲" }, { cookie });
+check("admin creates member", mbCreate.status === 200 && !!mbCreate.data.id && mbCreate.data.path === "/m/" + mbCreate.data.id, JSON.stringify(mbCreate.data).slice(0, 90));
+const MID = mbCreate.data.id;
+const mbDup = await j("/api/admin/member", { action: "create", username: "苹果正式会员", password: "member-pw-2", days: 30 }, { cookie });
+check("duplicate member username rejected", mbDup.status === 409);
+const mbList = await (await fetch(BASE + "/api/admin/member", { headers: { cookie } })).json();
+check("member listed for admin", mbList.ok === true && (mbList.members || []).some((m) => m.id === MID && m.username === "苹果正式会员" && !("pw_hash" in m)));
+const mbPage = await fetch(BASE + "/m/" + MID);
+const mbPageHtml = await mbPage.text();
+check("member page pre-login shows password box + logout button", mbPage.status === 200 && mbPageHtml.includes('id="pw"') && mbPageHtml.includes('id="logoutBtn"') && !mbPageHtml.includes("/s/"));
+check("unknown member page 404s", (await fetch(BASE + "/m/zzzzzzzzzzzz")).status === 404);
+check("member me requires login", (await fetch(BASE + "/api/member/me")).status === 401);
+const mbLoginRes = await fetch(BASE + "/api/member/login", {
+  method: "POST", headers: { "content-type": "application/json" },
+  body: JSON.stringify({ id: MID, password: "member-pw-1" }),
+});
+const mbcookie = (mbLoginRes.headers.get("set-cookie") || "").split(";")[0];
+check("member login ok", mbLoginRes.status === 200 && mbcookie.startsWith("msess="));
+const mbMe = await (await fetch(BASE + "/api/member/me", { headers: { cookie: mbcookie } })).json();
+check("member me: remaining time + sealed link only, no real address",
+  mbMe.ok === true && mbMe.username === "苹果正式会员" && mbMe.days_left >= 29 && mbMe.days_left <= 30 &&
+  typeof mbMe.link === "string" && mbMe.link.includes("/s/") && !JSON.stringify(mbMe).includes("8899"),
+  JSON.stringify(mbMe).slice(0, 110));
+const mbFetch = await fetch(mbMe.link);
+check("member link serves the main subscription", mbFetch.status === 200 && (await mbFetch.text()) === expectedSub);
+const mbOut = await fetch(BASE + "/api/member/logout", { method: "POST" });
+const mbOutCookie = mbOut.headers.get("set-cookie") || "";
+check("member logout expires session cookie", mbOut.status === 200 && mbOutCookie.startsWith("msess=;") && mbOutCookie.includes("Max-Age=0"));
+await j("/api/admin/member", { id: MID, action: "disable" }, { cookie });
+check("member link dead after disable", (await fetch(mbMe.link)).status === 403);
+await j("/api/admin/member", { id: MID, action: "enable" }, { cookie });
+check("member link back after enable", (await fetch(mbMe.link)).status === 200);
+await j("/api/admin/member", { id: MID, action: "set_expiry", expires_at: Math.floor(Date.now() / 1000) - 90000 }, { cookie });
+const mbExpFetch = await fetch(mbMe.link);
+check("expired member link answers the plain notice", mbExpFetch.status === 403 && (await mbExpFetch.text()) === "已到期，请联系卖家");
+await j("/api/admin/member", { id: MID, action: "extend", days: 10001 }, { cookie });
+const mbRevived = await fetch(mbMe.link);
+check("extended member link alive again with real content", mbRevived.status === 200 && (await mbRevived.text()) === expectedSub);
+const mbDelActive = await j("/api/admin/member", { id: MID, action: "delete" }, { cookie });
+check("delete of active member refused", mbDelActive.status === 400);
+await j("/api/admin/member", { id: MID, action: "disable" }, { cookie });
+const mbDel = await j("/api/admin/member", { id: MID, action: "delete" }, { cookie });
+check("member deleted, link + page gone", mbDel.status === 200 && (await fetch(mbMe.link)).status === 404 && (await fetch(BASE + "/m/" + MID)).status === 404);
+
 // ---- minute-level durations (admin licenses + guests) ----
 const MM1 = "TEST-MACH-0000-0101", MM2 = "TEST-MACH-0000-0102", MM3 = "TEST-MACH-0000-0103";
 const minIssue = await j("/api/admin/issue", { machineCode: MM1, durationValue: 5, durationUnit: "minute", note: "五分钟客户", mode: "code" }, { cookie });
