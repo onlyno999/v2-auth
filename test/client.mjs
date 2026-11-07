@@ -1,6 +1,7 @@
 // End-to-end test for v2-auth (assumes `wrangler pages dev` on :8788
 // with .dev.vars ADMIN_PASSWORD=liantong-test-pw).
 import { parseKeyDescription, readTlv } from "../functions/lib/attest.js";
+import vm from "node:vm";
 
 const BASE = "http://127.0.0.1:8788";
 let pass = 0, fail = 0;
@@ -300,6 +301,16 @@ const afterDel = await (await fetch(BASE + "/api/admin/devices", { headers: { co
 check("device deleted from table", delDev.status === 200 && !(afterDel.devices || []).some((d) => d.machine === M1));
 const valAfterDel = await j("/api/validate", { machineCode: M1, token: act1.data.token });
 check("validate denied after device delete", valAfterDel.status === 403);
+
+// ---- console page scripts must parse (a broken inline script
+// kills every button on the page, login included) ----
+{
+  const consoleHtml = await (await fetch(BASE + "/")).text();
+  const blocks = [...consoleHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  let parseOk = blocks.length > 0;
+  for (const b of blocks) { try { new vm.Script(b); } catch { parseOk = false; } }
+  check("console page inline scripts parse", parseOk && !consoleHtml.includes("<redacted>"));
+}
 
 // ---- guest customers (admin-managed; /g/<id> page + sealed link) ----
 const expectedSub = readFileSync(new URL("./fixtures/sub_main.txt", import.meta.url), "utf8");

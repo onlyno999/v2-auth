@@ -813,7 +813,7 @@ $("memberCreateBtn").onclick = async () => {
   const body = {
     action: "create",
     username: $("muser").value.trim(),
-    password: <redacted>
+    password: $("mpw").value,
     ...durFields("mdurVal", "mdurUnit"),
     note: $("mnote").value.trim(),
   };
